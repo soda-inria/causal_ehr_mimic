@@ -1,0 +1,10 @@
+# Ignore all files in this dir...
+*
+
+# ... except for thes ones.
+!.gitignore
+!README.md
+!jupytext.toml
+
+# ... and py files comming from jupytext
+!*.py

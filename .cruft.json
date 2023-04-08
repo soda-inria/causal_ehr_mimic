@@ -1,0 +1,32 @@
+{
+  "template": "git@gitlab.has-sante.fr:has-sante/public/cookiecutter-prod-python-has.git",
+  "commit": "a50da3a65115a8cf5be5a6eec1d683c446919d95",
+  "checkout": null,
+  "context": {
+    "cookiecutter": {
+      "project_name": "caumim",
+      "project_slug": "caumim",
+      "package_name": "caumim",
+      "friendly_name": "Caumim",
+      "author": "Matthieu Doutreligne",
+      "email": "matt.dout@gmail.com",
+      "project_type": "package",
+      "docker_enabled": "no",
+      "docs_enabled": "yes",
+      "jupyter_notebooks_enabled": "yes",
+      "linting_enabled": "yes",
+      "tests_enabled": "yes",
+      "remote_vcs_url": "https://gitlab.com",
+      "remote_vcs_project_path": "caumim",
+      "project_repository_url": "https://gitlab.com/strayMat/caumim",
+      "documentation_url": "https://straymat.gitlab.io/caumim",
+      "used_language": "english",
+      "version": "0.0.0",
+      "_copy_without_render": [
+        "docs/source/_templates/*"
+      ],
+      "_template": "git@gitlab.has-sante.fr:has-sante/public/cookiecutter-prod-python-has.git"
+    }
+  },
+  "directory": null
+}

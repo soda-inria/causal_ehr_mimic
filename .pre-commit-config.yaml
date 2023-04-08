@@ -1,0 +1,102 @@
+---
+repos:
+  - repo: local
+    hooks:
+      - id: bandit
+        name: bandit
+        language: system
+        entry: poetry run bandit -c pyproject.toml
+
+      - id: black
+        name: black
+        language: system
+        types: [python]
+        entry: poetry run black --config pyproject.toml
+
+      - id: detect-secrets
+        name: detect-secrets
+        language: system
+        entry: poetry run detect-secrets-hook
+        exclude: ^(poetry\.lock|\.cruft\.json|\.ipynb)$
+        #
+        exclude_types: [jupyter]
+        #
+
+      - id: interrogate
+        name: interrogate
+        language: system
+        pass_filenames: false
+        entry: poetry run interrogate
+
+      - id: isort
+        name: isort
+        language: system
+        types: [python]
+        entry: poetry run isort
+
+      - id: mypy
+        name: mypy
+        language: system
+        types: [python]
+        entry: poetry run mypy
+        #
+        exclude: ^(notebooks/.*\.py)$
+        #
+      - id: pylint
+        name: pylint
+        language: system
+        types: [python]
+        entry: poetry run pylint --rcfile=pyproject.toml
+        #
+        exclude: ^(notebooks/.*\.py)$
+        #
+
+      - id: pyupgrade
+        name: pyupgrade
+        language: system
+        types: [python]
+        entry: poetry run pyupgrade
+
+      - id: yamllint
+        name: yamllint
+        language: system
+        files: .*\.(yml|yaml)
+        entry: poetry run yamllint --config-file=yamllint-config.yml
+
+      - id: check-added-large-files
+        name: check-added-large-files
+        language: system
+        # 100MB
+        entry: poetry run check-added-large-files --maxkb=100000
+
+      - id: check-ast
+        name: check-ast
+        language: system
+        types: [python]
+        entry: poetry run check-ast
+
+      - id: debug-statement-hook
+        name: debug-statement-hook
+        language: system
+        types: [python]
+        entry: poetry run debug-statement-hook
+
+      - id: end-of-file-fixer
+        name: end-of-file-fixer # Ensure files ONLY end in a newline
+        language: system
+        types: [text]
+        entry: poetry run end-of-file-fixer
+        exclude_types: [jupyter]
+
+      - id: pretty-format-json
+        name: pretty-format-json # Sort and indent
+        language: system
+        files: .*\.json
+        entry: poetry run pretty-format-json --autofix --no-ensure-ascii
+        exclude: ^(\.cruft\.json)$
+
+      - id: trailing-whitespace-fixer
+        name: trailing-whitespace-fixer # Trim
+        language: system
+        types: [text]
+        entry: poetry run trailing-whitespace-fixer --markdown-linebreak-ext=md
