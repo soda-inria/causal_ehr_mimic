@@ -25,11 +25,12 @@ classifiers = [
 # Changelog = "https://gitlab.com/strayMat/caumim/releases"
 
 [tool.poetry.dependencies]
-python = "^3.8"
+python = "3.10.10"
 
 # Project-Specific
 python-dotenv = "^0.20.0"
 click = "^8.0.4"
+ibis-framework = {extras = ["duckdb"], version = "^5.0.0"}
 [tool.poetry.group.notebooks.dependencies]
 # Jupyter Notebook
 jupyter = "^1.0.0"

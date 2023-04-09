@@ -11,7 +11,7 @@ tests:
     - has-generic
     - docker
   script:
-    - pip install -U poetry
+    - pip install -U poetry==1.4.0
     - make provision-environment
     - make lint
     - make coverage
