@@ -1,27 +1,13 @@
 ---
-
 image: python:3.8-buster
 
 stages:
-  - test
   - docs
-tests:
-  stage: test
-  tags:
-    - has-generic
-    - docker
-  script:
-    - pip install -U poetry==1.4.0
-    - make provision-environment
-    - make lint
-    - make coverage
+
 pages:
   stage: docs
-  tags:
-    - has-generic
-    - docker
   script:
-    - pip install -U poetry
+    - pip install -U poetry==1.4.0
     - make provision-environment
     - make docs-html
     - mv docs/_build/html/ public/

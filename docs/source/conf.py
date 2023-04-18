@@ -71,12 +71,26 @@ html_favicon = "_static/favicon.ico"
 html_theme_options = {
     "footer_items": ["sphinx-version"],
     "logo": {
-        "image_light": "logo-light.svg",
-        "image_dark": "logo-dark.svg",
+        "image_light": "logo-project.svg",
+        "image_dark": "logo-project.svg",
     },
+    "icon_links": [
+        {
+            "name": "SoDa",
+            "url": "https://team.inria.fr/soda/",
+            "icon": "_static/logo-project.svg",
+            "type": "local",
+        },
+        {
+            "name": "GitLab",
+            "url": "https://gitlab.com/strayMat/caumim",
+            "icon": "fa-brands fa-square-gitlab",
+            "type": "fontawesome",
+        },
+    ],
 }
 html_show_sourcelink = (
-    False  # Remove 'view source code' from top of page (for html, not python)
+    True  # Remove 'view source code' from top of page (for html, not python)
 )
 
 # -- Extension configurations ---------------------------------------------------
