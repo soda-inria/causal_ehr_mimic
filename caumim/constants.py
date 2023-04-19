@@ -17,6 +17,7 @@ ROOT_DIR = Path(
 # Data
 DIR2DATA = ROOT_DIR / "data"
 DIR2RESOURCES = DIR2DATA / "resources"
+DIR2META_CONCEPTS = DIR2RESOURCES / "meta_concepts"
 DIR2EXPERIENCES = DIR2DATA / "experiences"
 DIR2RESULTS = DIR2DATA / "results"
 DIR2MIMIC = DIR2DATA / "mimiciv_as_parquet"
