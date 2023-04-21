@@ -56,7 +56,9 @@ base_population_with_ards_info["ards_at_admission"] = (
 n_patients_wo_o2_measures = (base_population_with_ards_info[["pao2fio2ratio_median_at_admission"]].isna().sum(axis=1) == 1).sum()
 patients_w_ards_at_admission = base_population_with_ards_info.loc[
     base_population_with_ards_info["ards_at_admission"] == True
-]
+].merge(
+    base_population.to_pandas(), on="subject_id", how="inner"
+)
 print("Number of patients without any Fi/O2 measures: ", n_patients_wo_o2_measures)
 print(
     f"Number of patients with ards at admission: {patients_w_ards_at_admission.shape[0]}"
@@ -64,47 +66,34 @@ print(
 
 
 # %%
-# Nothing in the procedures
-procedures = pl.read_parquet(DIR2MIMIC / "mimiciv_hosp.d_icd_procedures/*")
-procedures.write_csv(DIR2RESOURCES / "procedures.csv")
-# %% [markdown]
-# Looking for prone positioning
-# candidates are 
-# position por : 228474, no log
-# position change: 227952 or 224066
-# position : 224093
 # position rest 227915 : Nope, very few logs (160)
-chart_events = pl.scan_parquet(DIR2MIMIC / "mimiciv_icu.chartevents/*")
+input_events = pl.scan_parquet(DIR2MIMIC / "mimiciv_icu.inputevents/*")
 d_items = pl.read_parquet(DIR2MIMIC / "mimiciv_icu.d_items/*")
 # %% 
-position_events = chart_events.filter(
-    pl.col("itemid").is_in([227952, 224066, 224093])
+cisatracurium_input = 221555
+nbma_events = input_events.filter(
+    pl.col("itemid").is_in([cisatracurium_input])
 ).collect().join(
     d_items.select(["itemid", "label"]), on="itemid", how="inner"
-)
+).to_pandas()
 # %% 
-# position change
-print(
-    position_events.filter(pl.col("itemid").is_in([227952, 224066]))["value"].value_counts().to_pandas()
-)
-# position
-position_events.filter(pl.col("itemid")==224093)["value"].value_counts().to_pandas()
 
 # type of positions 
 # %%
 # Intervention
-position_prone = position_events.filter(pl.col("value").str.contains("Prone")).to_pandas()
 intervention_pop = patients_w_ards_at_admission.merge(
-    position_prone[["subject_id"]].drop_duplicates(), on="subject_id", how="inner"
+    nbma_events[["stay_id"]].drop_duplicates(), on="stay_id", how="inner"
 )
 intervention_pop
-
 # %%
 # Control
-position_supine = position_events.filter(pl.col("value").str.contains("Supine")).to_pandas()
-control_pop = patients_w_ards_at_admission.merge(
-    position_supine[["subject_id"]].drop_duplicates(), on="subject_id", how="inner"
-)
-control_pop = control_pop.loc[~control_pop["subject_id"].isin(intervention_pop["subject_id"])]
+control_pop = patients_w_ards_at_admission.loc[~patients_w_ards_at_admission["subject_id"].isin(intervention_pop["subject_id"])]
 control_pop
-# TODO: ventilation for both population
+# %%
+input_itemid = 225837
+input = input_events.filter(
+    pl.col("itemid").is_in([input_itemid])
+).collect().join(
+    d_items.select(["itemid", "label"]), on="itemid", how="inner"
+).to_pandas()
+input
