@@ -18,6 +18,7 @@ ROOT_DIR = Path(
 DIR2DATA = ROOT_DIR / "data"
 DIR2RESOURCES = DIR2DATA / "resources"
 DIR2META_CONCEPTS = DIR2RESOURCES / "meta_concepts"
+DIR2COHORT = DIR2DATA / "cohort"
 DIR2EXPERIENCES = DIR2DATA / "experiences"
 DIR2RESULTS = DIR2DATA / "results"
 DIR2MIMIC = DIR2DATA / "mimiciv_as_parquet"
@@ -45,16 +46,9 @@ COLNAME_PATIENT_ID = "subject_id"
 COLNAME_HADM_ID = "hadm_id"
 
 # Other Colnames
-COLNAME_ADMITTIME = "admittime"
-COLNAME_DISCHTIME = "dischtime"
-COLNAME_ICU_INTIME = "intime"
-COLNAME_ICU_OUTTIME = "outtime"
-COLNAME_SEGMENT_ID = "segment_id"
-COLNAME_ICUSTAY_ID = "stay_id"
+COLNAME_INCLUSION_START = "inclusion_start"
+COLNAME_FOLLOWUP_START = "followup_start"
 
-COLNAME_FIRST_CARE_UNIT = "first_careunit"
-COL_INTERVENTION_TS = "intervention_timestamp"
-COL_ICUSTAYID = "ICUSTAY_ID"
 
 # Expert features
 STATIC_FEATURES_BASICS = ["age", "gender", "insurance"]

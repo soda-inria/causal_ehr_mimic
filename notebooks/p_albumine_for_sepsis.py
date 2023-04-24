@@ -6,52 +6,80 @@ in the MIMIC-IV database.
 %reload_ext autoreload
 %autoreload 2
 import numpy as np
-from caumim.target_population.utils import get_base_population, get_flat_information, get_drug_names_from_str
+from caumim.target_population.utils import create_cohort_folder, get_base_population, get_cohort_hash, get_flat_information, get_drug_names_from_str, roll_inclusion_criteria
 from caumim.constants import *
 import polars as pl
 import pandas as pd
+from sklearn.utils import Bunch
+from datetime import datetime
+from caumim.target_population.albumin_for_sepsis import COHORT_CONFIG_ALBUMIN_FOR_SEPSIS
 pd.set_option("display.max_columns", None)
 pd.set_option("display.max_colwidth", 100)
 # %%
 tables = [file_.name for file_ in list(DIR2MIMIC.iterdir())]
 tables.sort(reverse=True)
 print(tables)
-patients = pl.read_parquet(DIR2MIMIC / "mimiciv_hosp.patients/*")
-patients.head()
 # %%
-base_population = get_base_population(
-    min_age=18, min_icu_survival_unit_day=1, min_los_icu_unit_day=1
-)
-# sepsis3 
-sepsis3_stays = pl.read_parquet(DIR2MIMIC / "mimiciv_derived.sepsis3").filter(
-    pl.col("sepsis3").eq(True)
-).join(base_population, on="stay_id", how="inner").to_pandas()
-sepsis3_subject_ids = sepsis3_stays["subject_id"].unique()
-sepsis3_stay_ids = sepsis3_stays["stay_id"].unique()
-print("Number of patients with sepsis3: ", len(sepsis3_subject_ids))
-print("Number of icu admissions with sepsis3: ", len(sepsis3_stay_ids))
+cohort_config = Bunch(**COHORT_CONFIG_ALBUMIN_FOR_SEPSIS)
+print(cohort_config)
+create_cohort_folder(cohort_config)
 # %%
-# crystalloids
+# 1 - Define the inclusion events, ie. the event that defines when a patient
+# enter the cohort.
+
+# Inclusion event: First administration of crystalloids during the 24 first
+# hours of ICU stay
 input_events = pl.scan_parquet(DIR2MIMIC / "mimiciv_icu.inputevents/*")
+icu_stays = pl.scan_parquet(DIR2MIMIC/ "mimiciv_icu.icustays/*")
 # full list of crystalloids taken from :https://www.ncbi.nlm.nih.gov/books/NBK537326/
 crystalloids_itemids = [
-    226364, # operating room crystalloids
-    226375, # post-anesthesia care unit crystalloids
-    225158, #NaCl 0.9%,
-    225159, #NaCl 0.45%,
-    225161, #NaCl 3% 
-    220967, #Dextrose 5% / Ringers Lactate,
-    220968, #Dextrose 10% / Ringers
-    220964, #"Dextrose 5% / Saline 0,9%"
-    220965, #"Dextrose 5% / Saline 0,45%"
-
+    226364,  # operating room crystalloids
+    226375,  # post-anesthesia care unit crystalloids
+    225158,  # NaCl 0.9%,
+    225159,  # NaCl 0.45%,
+    225161,  # NaCl 3%
+    220967,  # Dextrose 5% / Ringers Lactate,
+    220968,  # Dextrose 10% / Ringers
+    220964,  # "Dextrose 5% / Saline 0,9%"
+    220965,  # "Dextrose 5% / Saline 0,45%"
 ]
-crystalloids = input_events.filter(
-    pl.col("itemid").is_in(crystalloids_itemids)).collect().to_pandas()
-
-crystalloids_events_for_sepsis = sepsis3_stays[["stay_id", "icu_intime"]].drop_duplicates().merge(
-    crystalloids, on="stay_id", how="inner")
-print("Number of patients with sepsis3 and crystalloids: ", len(crystalloids_events_for_sepsis["subject_id"].unique()))
+crystalloids_inputs = (
+    input_events.filter(pl.col("itemid").is_in(crystalloids_itemids)).join(
+        icu_stays.select(["stay_id", "intime"]), on="stay_id", how="inner"
+    )
+)
+first_crystalloids = (
+    crystalloids_inputs.sort(["stay_id", "starttime"])
+    .groupby("stay_id")
+    .agg([pl.first("starttime"), pl.first("intime")])
+    .collect()
+    .to_pandas()
+    .rename(columns={"starttime": COLNAME_INCLUSION_START})
+)
+first_crystalloids["delta_crystalloids_icu_intime"] = (
+    first_crystalloids[COLNAME_INCLUSION_START]
+    - first_crystalloids["intime"]
+)
+inclusion_event = first_crystalloids.loc[
+    first_crystalloids["delta_crystalloids_icu_intime"].dt.days == 0
+]
+# %%
+base_population = get_base_population(
+    min_age=cohort_config.min_age,
+    min_icu_survival_unit_day=cohort_config.min_icu_survival_unit_day,
+    min_los_icu_unit_day=cohort_config.min_los_icu_unit_day,
+)
+# sepsis
+sepsis3_stays = pd.read_parquet(DIR2MIMIC / "mimiciv_derived.sepsis3")
+sepsis3_stays = sepsis3_stays.loc[sepsis3_stays["sepsis3"] == True, ["stay_id"]]
+inclusion_criteria = {
+    'base_population': base_population,
+    'sepsis3': sepsis3_stays,
+    'inclusion_event': inclusion_event
+}
+target_population, inclusion_counts = roll_inclusion_criteria(inclusion_criteria)
+target_population
+# TODO:WARNING: I lost 7930 persons comapred to the initial notebook.
 # %%
 albumin_itemids = [
     # 220861, #"Albumin (Human) 20% Not in use
