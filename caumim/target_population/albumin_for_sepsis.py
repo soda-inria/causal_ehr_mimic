@@ -2,6 +2,8 @@ import pandas as pd
 from sklearn.utils import Bunch
 import polars as pl
 from caumim.constants import (
+    COLNAME_MORTALITY_28D,
+    COLNAME_MORTALITY_90D,
     COLNAME_TREATMENT_START,
     COLNAME_TREATMENT_STATUS,
     DIR2COHORT,
@@ -145,9 +147,27 @@ def get_population(cohort_config):
     target_trial_population[COLNAME_TREATMENT_STATUS] = target_trial_population[
         COLNAME_TREATMENT_START
     ].notnull()
-    if cohort_config.save_cohort:
-        target_trial_population.to_parquet(
-            cohort_folder / (FILENAME_TARGET_POPULATION)
+
+    # 5 - Define outcomes
+    # 28-days and 90-days mortality
+    mask_dod = target_trial_population["dod"].notnull()
+    days_to_death = (
+        target_trial_population["dod"]
+        - target_trial_population[COLNAME_INCLUSION_START]
+    ).dt.days
+
+    target_trial_population[COLNAME_MORTALITY_28D] = (
+        mask_dod & (days_to_death <= 28)
+    ).astype(int)
+    target_trial_population[COLNAME_MORTALITY_90D] = (
+        mask_dod & (days_to_death <= 90)
+    ).astype(int)
+
+    col_name_outcomes = [COLNAME_MORTALITY_28D, COLNAME_MORTALITY_90D]
+    # 6 - Save the cohort
+    for outcome in col_name_outcomes:
+        logger.info(
+            f"Outcome `{outcome}` prevalence: {100 * target_trial_population[outcome].mean():.2f}%"
         )
     logger.info(
         f"Number of treated patients: {target_trial_population[COLNAME_TREATMENT_STATUS].sum()}",
@@ -155,6 +175,11 @@ def get_population(cohort_config):
     logger.info(
         f"Number of control patients: {(1 - target_trial_population[COLNAME_TREATMENT_STATUS]).sum()}",
     )
+    if cohort_config.save_cohort:
+        target_trial_population.to_parquet(
+            cohort_folder / (FILENAME_TARGET_POPULATION)
+        )
+    return target_population
 
 
 if __name__ == "__main__":

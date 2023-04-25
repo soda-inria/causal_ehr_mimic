@@ -51,7 +51,8 @@ COLNAME_INCLUSION_START = "inclusion_start"
 COLNAME_FOLLOWUP_START = "followup_start"
 COLNAME_TREATMENT_START = "treatment_start"
 COLNAME_TREATMENT_STATUS = "treatment_status"
-
+COLNAME_MORTALITY_28D = "mortality_28days"
+COLNAME_MORTALITY_90D = "mortality_90days"
 
 # legacy: keep?
 # Expert features

@@ -126,3 +126,23 @@ print("Number of control patients (sepsis3 and crystalloids only in 24h:", (1 - 
 cohort_folder = create_cohort_folder(cohort_config)
 target_trial_population = pd.read_parquet(cohort_folder/"target_population")
 
+# 5 - Define outcomes
+# 28-days and 90-days mortality
+mask_dod = target_trial_population["dod"].notnull()
+days_to_death = (
+    target_trial_population["dod"]
+    - target_trial_population[COLNAME_INCLUSION_START]
+).dt.days
+
+target_trial_population[COLNAME_MORTALITY_28D] = (
+    mask_dod & (days_to_death <= 28)
+).astype(int)
+target_trial_population[COLNAME_MORTALITY_90D] = (
+    mask_dod & (days_to_death <= 90)
+).astype(int)
+
+col_name_outcomes = [COLNAME_MORTALITY_28D, COLNAME_MORTALITY_90D]
+for outcome in col_name_outcomes:
+    print(
+        f"Outcome `{outcome}` prevalence: {100 * target_trial_population[outcome].mean():.2f}%"
+    )
