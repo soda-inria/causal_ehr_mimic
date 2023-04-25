@@ -38,7 +38,7 @@ def roll_inclusion_criteria(
         pd.DataFrame.from_dict(inclusion_counts, orient="index").to_csv(
             cohort_path / "inclusion_counts.csv"
         )
-    return to_pandas(target_population), inclusion_counts
+    return to_pandas(target_population)
 
 
 def get_base_population(
@@ -83,24 +83,20 @@ def get_base_population(
 
 
 def get_cohort_hash(cohort_config: Dict):
-    return str(
-        hash(
-            datetime.now().strftime("%Y%m%d%H%M%S")
-            + "__".join([f"{k}_{v}" for k, v in cohort_config.items()])
-        )
-    )
+    return str(hash("__".join([f"{k}_{v}" for k, v in cohort_config.items()])))
 
 
-def create_cohort_folder(cohort_config: Dict):
-    cohort_hash = get_cohort_hash(cohort_config)
-    t0 = datetime.now().strftime("%Y-%m-%d")
-    cohort_folder = (
-        DIR2COHORT / f"{cohort_config.cohort_name}_{t0}_{cohort_hash}"
-    )
+def create_cohort_folder(cohort_config: Dict) -> Path:
+    # cohort_hash = get_cohort_hash(cohort_config)
+    # t0 = datetime.now().strftime("%Y-%m-%d")
+    cohort_folder = DIR2COHORT / f"{cohort_config.cohort_name}"
     cohort_folder.mkdir(parents=True, exist_ok=True)
-    pd.DataFrame.from_dict(cohort_config, orient="index").to_csv(
+    pd.DataFrame.from_dict(
+        cohort_config, orient="index", columns=["value"]
+    ).reset_index(names="config").to_csv(
         cohort_folder / "cohort_config.csv", index=False
     )
+    return cohort_folder
 
 
 # Legacy from mimproc ? keep it ?

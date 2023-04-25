@@ -32,10 +32,11 @@ DIR2DOCS_EXPERIENCES = DIR2DOCS_IMG / "experiences"
 DIR2DOCS_COHORT.mkdir(parents=True, exist_ok=True)
 DIR2DOCS_EXPERIENCES.mkdir(parents=True, exist_ok=True)
 
+# Default file names
+FILENAME_TARGET_POPULATION = "target_population"
 
 # COlUMNS
 # Colnames of the event table
-# TODO: change to be omop consistent
 COLNAME_CODE = "code"
 COLNAME_LABEL = "name"
 COLNAME_VALUE = "value"
@@ -48,8 +49,11 @@ COLNAME_HADM_ID = "hadm_id"
 # Other Colnames
 COLNAME_INCLUSION_START = "inclusion_start"
 COLNAME_FOLLOWUP_START = "followup_start"
+COLNAME_TREATMENT_START = "treatment_start"
+COLNAME_TREATMENT_STATUS = "treatment_status"
 
 
+# legacy: keep?
 # Expert features
 STATIC_FEATURES_BASICS = ["age", "gender", "insurance"]
 # Variables grouping derived from [Wang et al., 2020]() :

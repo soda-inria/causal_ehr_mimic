@@ -13,6 +13,7 @@ import pandas as pd
 from sklearn.utils import Bunch
 from datetime import datetime
 from caumim.target_population.albumin_for_sepsis import COHORT_CONFIG_ALBUMIN_FOR_SEPSIS
+from caumim.utils import to_lazyframe
 pd.set_option("display.max_columns", None)
 pd.set_option("display.max_colwidth", 100)
 # %%
@@ -27,7 +28,7 @@ create_cohort_folder(cohort_config)
 # 1 - Define the inclusion events, ie. the event that defines when a patient
 # enter the cohort.
 
-# Inclusion event: First administration of crystalloids during the 24 first
+# Inclusion start: First administration of crystalloids during the 24 first
 # hours of ICU stay
 input_events = pl.scan_parquet(DIR2MIMIC / "mimiciv_icu.inputevents/*")
 icu_stays = pl.scan_parquet(DIR2MIMIC/ "mimiciv_icu.icustays/*")
@@ -60,6 +61,7 @@ first_crystalloids["delta_crystalloids_icu_intime"] = (
     first_crystalloids[COLNAME_INCLUSION_START]
     - first_crystalloids["intime"]
 )
+# Only during first day
 inclusion_event = first_crystalloids.loc[
     first_crystalloids["delta_crystalloids_icu_intime"].dt.days == 0
 ]
@@ -78,9 +80,9 @@ inclusion_criteria = {
     'inclusion_event': inclusion_event
 }
 target_population, inclusion_counts = roll_inclusion_criteria(inclusion_criteria)
-target_population
-# TODO:WARNING: I lost 7930 persons comapred to the initial notebook.
+target_population.head(3)
 # %%
+# 3 - Define the treatment events  
 albumin_itemids = [
     # 220861, #"Albumin (Human) 20% Not in use
     220862, #Albumin 25%,Albumin 25%
@@ -88,55 +90,39 @@ albumin_itemids = [
     220864, #Albumin 5%
 ]
 albumin = input_events.filter(
-    pl.col("itemid").is_in(albumin_itemids)).collect().to_pandas()
-albumin_events_for_sepsis = crystalloids_events_for_sepsis[["stay_id", 'icu_intime']].drop_duplicates().merge(
+    pl.col("itemid").is_in(albumin_itemids))
+combined_albumin_for_target_population = to_lazyframe(
+    target_population[["stay_id", 'icu_intime', COLNAME_INCLUSION_START]].drop_duplicates()).join(
     albumin, on="stay_id", how="inner")
-print("Number of patients with sepsis3 and albumin: ", len(albumin_events_for_sepsis["subject_id"].unique()))
-# %% timing of treatments
-# first crystalloids
-first_crystalloids = (
-    crystalloids_events_for_sepsis.sort_values("starttime").groupby("stay_id")
-        .first()[["starttime", "icu_intime"]].reset_index().rename(columns={"starttime": "crystalloids_starttime"})
-)
-first_crystalloids["delta_crystalloids_icu_intime"] = (
-    first_crystalloids["crystalloids_starttime"] - first_crystalloids["icu_intime"]
-)
-first_crystalloids_in24h = first_crystalloids.loc[
-    first_crystalloids["delta_crystalloids_icu_intime"].dt.days == 0 
-]
-# # first albumin
+
+# First albumin
 first_albumin = (
-    albumin_events_for_sepsis.sort_values("starttime").groupby("stay_id")
-        .first()[["starttime", "icu_intime"]].reset_index().rename(columns={"starttime": "albumin_starttime"})
+    combined_albumin_for_target_population.sort("starttime").groupby("stay_id")
+        .agg([pl.first("starttime"), pl.first("icu_intime"), pl.first(COLNAME_INCLUSION_START)])
+        .collect().to_pandas().rename(columns={"starttime": COLNAME_TREATMENT_START})
 ) 
+# Consider only first day albumin
 first_albumin["delta_albumin_icu_intime"] = (
-    first_albumin["albumin_starttime"] - first_albumin["icu_intime"]
+    first_albumin[COLNAME_TREATMENT_START] - first_albumin["icu_intime"]
 )
 first_albumin_in24h = first_albumin.loc[
     first_albumin["delta_albumin_icu_intime"].dt.days == 0 
 ]
-# %%
-# albumin should not preced crystalloids
-treaments_start_per_stay = first_crystalloids_in24h.merge(
-    first_albumin_in24h, on="stay_id", how="left"
-)
-albumin_preceded_crystalloids = treaments_start_per_stay.loc[
-    treaments_start_per_stay["crystalloids_starttime"] > treaments_start_per_stay["albumin_starttime"]
+first_albumin_in24h = first_albumin_in24h.loc[
+    first_albumin_in24h[COLNAME_TREATMENT_START] > first_albumin_in24h[COLNAME_INCLUSION_START]
 ]
+first_albumin_in24h
 # %%
-# treatment_stays
-treatment_stays = sepsis3_stays.merge(
-    first_albumin_in24h[["stay_id"]].drop_duplicates(), on="stay_id", how="inner"
-)  
-treatment_stays.loc[
-    ~treatment_stays["stay_id"].isin(albumin_preceded_crystalloids["stay_id"])
-]
+# 4- Define treatment and control population:
+target_trial_population = target_population.merge(
+    first_albumin_in24h[["stay_id", COLNAME_TREATMENT_START]].drop_duplicates(), on="stay_id", how="left")
 
-# control stays
-control_stays = sepsis3_stays.merge(
-    first_crystalloids_in24h[["stay_id"]].drop_duplicates(), on="stay_id", how="left")
-control_stays = control_stays.loc[
-    ~control_stays["stay_id"].isin(treatment_stays["stay_id"])
-]
-print("Number of treated patients (sepsis3 and crystalloids/albumin combination) in 24h:", len(control_stays["subject_id"].unique()))
-print("Number of control patients (sepsis3 and crystalloids only in 24h:", len(treatment_stays["subject_id"].unique()))
+target_trial_population[COLNAME_TREATMENT_STATUS] = target_trial_population[COLNAME_TREATMENT_START].notnull()
+
+print("Number of treated patients (sepsis3 and crystalloids/albumin combination) in 24h:", target_trial_population[COLNAME_TREATMENT_STATUS].sum())
+print("Number of control patients (sepsis3 and crystalloids only in 24h:", (1 - target_trial_population[COLNAME_TREATMENT_STATUS]).sum())
+# %%
+# 5 - Define outcomes
+cohort_folder = create_cohort_folder(cohort_config)
+target_trial_population = pd.read_parquet(cohort_folder/"target_population")
+
