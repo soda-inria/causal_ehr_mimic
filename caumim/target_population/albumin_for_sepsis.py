@@ -4,8 +4,8 @@ import polars as pl
 from caumim.constants import (
     COLNAME_MORTALITY_28D,
     COLNAME_MORTALITY_90D,
-    COLNAME_TREATMENT_START,
-    COLNAME_TREATMENT_STATUS,
+    COLNAME_INTERVENTION_START,
+    COLNAME_INTERVENTION_STATUS,
     DIR2COHORT,
     DIR2MIMIC,
     COLNAME_INCLUSION_START,
@@ -21,13 +21,15 @@ from caumim.target_population.utils import (
 )
 from caumim.utils import to_lazyframe
 
-COHORT_CONFIG_ALBUMIN_FOR_SEPSIS = {
-    "min_age": 18,
-    "min_icu_survival_unit_day": 1,
-    "min_los_icu_unit_day": 1,
-    "cohort_name": "albumin_for_sepsis",
-    "save_cohort": True,
-}
+COHORT_CONFIG_ALBUMIN_FOR_SEPSIS = Bunch(
+    **{
+        "min_age": 18,
+        "min_icu_survival_unit_day": 1,
+        "min_los_icu_unit_day": 1,
+        "cohort_name": "albumin_for_sepsis",
+        "save_cohort": True,
+    }
+)
 
 
 def get_population(cohort_config):
@@ -120,17 +122,17 @@ def get_population(cohort_config):
         )
         .collect()
         .to_pandas()
-        .rename(columns={"starttime": COLNAME_TREATMENT_START})
+        .rename(columns={"starttime": COLNAME_INTERVENTION_START})
     )
     # Consider only first day albumin
     first_albumin["delta_albumin_icu_intime"] = (
-        first_albumin[COLNAME_TREATMENT_START] - first_albumin["icu_intime"]
+        first_albumin[COLNAME_INTERVENTION_START] - first_albumin["icu_intime"]
     )
     first_albumin_in24h = first_albumin.loc[
         first_albumin["delta_albumin_icu_intime"].dt.days == 0
     ]
     first_albumin_in24h = first_albumin_in24h.loc[
-        first_albumin_in24h[COLNAME_TREATMENT_START]
+        first_albumin_in24h[COLNAME_INTERVENTION_START]
         > first_albumin_in24h[COLNAME_INCLUSION_START]
     ]
     first_albumin_in24h
@@ -138,15 +140,15 @@ def get_population(cohort_config):
     # 4- Define treatment and control population:
     target_trial_population = target_population.merge(
         first_albumin_in24h[
-            ["stay_id", COLNAME_TREATMENT_START]
+            ["stay_id", COLNAME_INTERVENTION_START]
         ].drop_duplicates(),
         on="stay_id",
         how="left",
     )
 
-    target_trial_population[COLNAME_TREATMENT_STATUS] = target_trial_population[
-        COLNAME_TREATMENT_START
-    ].notnull()
+    target_trial_population[
+        COLNAME_INTERVENTION_STATUS
+    ] = target_trial_population[COLNAME_INTERVENTION_START].notnull()
 
     # 5 - Define outcomes
     # 28-days and 90-days mortality
@@ -170,10 +172,10 @@ def get_population(cohort_config):
             f"Outcome `{outcome}` prevalence: {100 * target_trial_population[outcome].mean():.2f}%"
         )
     logger.info(
-        f"Number of treated patients: {target_trial_population[COLNAME_TREATMENT_STATUS].sum()}",
+        f"Number of treated patients: {target_trial_population[COLNAME_INTERVENTION_STATUS].sum()}",
     )
     logger.info(
-        f"Number of control patients: {(1 - target_trial_population[COLNAME_TREATMENT_STATUS]).sum()}",
+        f"Number of control patients: {(1 - target_trial_population[COLNAME_INTERVENTION_STATUS]).sum()}",
     )
     if cohort_config.save_cohort:
         target_trial_population.to_parquet(
@@ -183,4 +185,4 @@ def get_population(cohort_config):
 
 
 if __name__ == "__main__":
-    get_population(cohort_config=Bunch(**COHORT_CONFIG_ALBUMIN_FOR_SEPSIS))
+    get_population(cohort_config=COHORT_CONFIG_ALBUMIN_FOR_SEPSIS)

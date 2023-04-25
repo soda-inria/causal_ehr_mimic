@@ -99,28 +99,28 @@ combined_albumin_for_target_population = to_lazyframe(
 first_albumin = (
     combined_albumin_for_target_population.sort("starttime").groupby("stay_id")
         .agg([pl.first("starttime"), pl.first("icu_intime"), pl.first(COLNAME_INCLUSION_START)])
-        .collect().to_pandas().rename(columns={"starttime": COLNAME_TREATMENT_START})
+        .collect().to_pandas().rename(columns={"starttime": COLNAME_INTERVENTION_START})
 ) 
 # Consider only first day albumin
 first_albumin["delta_albumin_icu_intime"] = (
-    first_albumin[COLNAME_TREATMENT_START] - first_albumin["icu_intime"]
+    first_albumin[COLNAME_INTERVENTION_START] - first_albumin["icu_intime"]
 )
 first_albumin_in24h = first_albumin.loc[
     first_albumin["delta_albumin_icu_intime"].dt.days == 0 
 ]
 first_albumin_in24h = first_albumin_in24h.loc[
-    first_albumin_in24h[COLNAME_TREATMENT_START] > first_albumin_in24h[COLNAME_INCLUSION_START]
+    first_albumin_in24h[COLNAME_INTERVENTION_START] > first_albumin_in24h[COLNAME_INCLUSION_START]
 ]
 first_albumin_in24h
 # %%
 # 4- Define treatment and control population:
 target_trial_population = target_population.merge(
-    first_albumin_in24h[["stay_id", COLNAME_TREATMENT_START]].drop_duplicates(), on="stay_id", how="left")
+    first_albumin_in24h[["stay_id", COLNAME_INTERVENTION_START]].drop_duplicates(), on="stay_id", how="left")
 
-target_trial_population[COLNAME_TREATMENT_STATUS] = target_trial_population[COLNAME_TREATMENT_START].notnull()
+target_trial_population[COLNAME_INTERVENTION_STATUS] = target_trial_population[COLNAME_INTERVENTION_START].notnull()
 
-print("Number of treated patients (sepsis3 and crystalloids/albumin combination) in 24h:", target_trial_population[COLNAME_TREATMENT_STATUS].sum())
-print("Number of control patients (sepsis3 and crystalloids only in 24h:", (1 - target_trial_population[COLNAME_TREATMENT_STATUS]).sum())
+print("Number of treated patients (sepsis3 and crystalloids/albumin combination) in 24h:", target_trial_population[COLNAME_INTERVENTION_STATUS].sum())
+print("Number of control patients (sepsis3 and crystalloids only in 24h:", (1 - target_trial_population[COLNAME_INTERVENTION_STATUS]).sum())
 # %%
 # 5 - Define outcomes
 cohort_folder = create_cohort_folder(cohort_config)

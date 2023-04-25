@@ -1,5 +1,5 @@
 # Ignore all files in this dir...
-*
+*.ipynb
 
 # ... except for thes ones.
 !.gitignore

@@ -8,7 +8,7 @@ from mimproc.experiments.utils import (
 from mimproc.data.events_transformers import make_measure_sequences
 from typing import List, Union
 from caumim.constants import (
-    COLNAME_CATEGORY,
+    COLNAME_DOMAIN,
     COLNAME_CODE,
     COLNAME_ICUSTAY_ID,
     COLNAME_ICU_INTIME,
@@ -59,6 +59,7 @@ outcome). Description:
 Launch as : `python mimproc/exp/scripts/create_events_cohort_stroke_imagery.py
 --ehr_dir data/interim/ehr_cohort --output_dir data/clean/`
 """
+
 
 # TODO: split into cohort creation and variable extractions
 def create_cohort(
@@ -128,7 +129,7 @@ def create_cohort(
         on=COLNAME_ICUSTAY_ID,
         how="inner",
     )
-    measures = events.query(f"{COLNAME_CATEGORY} == 'measure'").merge(
+    measures = events.query(f"{COLNAME_DOMAIN} == 'measure'").merge(
         pd.DataFrame({COLNAME_CODE: code_whitelist}),
         on=COLNAME_CODE,
         how="inner",

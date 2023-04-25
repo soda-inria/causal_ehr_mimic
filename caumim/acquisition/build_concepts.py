@@ -1,11 +1,12 @@
 import requests
 
 """
-
+legacy: should be removed 
 Unsucessful attempt to run on duckdb the concept queries from the mimic-iv github repo.
 """
-#MIMICIVCONCEPTS_URL = "https://raw.githubusercontent.com/MIT-LCP/mimic-code/main/mimic-iv/concepts/"
+# MIMICIVCONCEPTS_URL = "https://raw.githubusercontent.com/MIT-LCP/mimic-code/main/mimic-iv/concepts/"
 MIMICIV_PSQL_CONCEPTS_URL = "https://raw.githubusercontent.com/MIT-LCP/mimic-code/main/mimic-iv/concepts_postgres/"
+
 
 def register_sql_functions(con):
     """
@@ -31,7 +32,10 @@ def register_sql_functions(con):
     )
     return
 
-def get_concept_query(concept_name: str, base_url:str = MIMICIV_PSQL_CONCEPTS_URL):
+
+def get_concept_query(
+    concept_name: str, base_url: str = MIMICIV_PSQL_CONCEPTS_URL
+):
     """
     Get the sql query from the mimic-iv github repo.
 

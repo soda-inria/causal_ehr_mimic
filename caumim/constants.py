@@ -37,22 +37,43 @@ FILENAME_TARGET_POPULATION = "target_population"
 
 # COlUMNS
 # Colnames of the event table
-COLNAME_CODE = "code"
-COLNAME_LABEL = "name"
-COLNAME_VALUE = "value"
-COLNAME_CATEGORY = "category"
-COLNAME_START = "starttime"
-COLNAME_END = "endtime"
 COLNAME_PATIENT_ID = "subject_id"
 COLNAME_HADM_ID = "hadm_id"
+COLNAME_ICUSTAY_ID = "stay_id"
+COLNAME_CODE = "code"
+COLNAME_LABEL = "label"
+COLNAME_VALUE = "value"
+COLNAME_DOMAIN = "domain"
+COLNAME_START = "starttime"
+COLNAME_END = "endtime"
+COLNAMES_EVENTS = [
+    COLNAME_PATIENT_ID,
+    COLNAME_HADM_ID,
+    COLNAME_ICUSTAY_ID,
+    COLNAME_START,
+    COLNAME_END,
+    COLNAME_DOMAIN,
+    COLNAME_CODE,
+    COLNAME_LABEL,
+    COLNAME_VALUE,
+]
 
 # Other Colnames
 COLNAME_INCLUSION_START = "inclusion_start"
-COLNAME_FOLLOWUP_START = "followup_start"
-COLNAME_TREATMENT_START = "treatment_start"
-COLNAME_TREATMENT_STATUS = "treatment_status"
+# COLNAME_FOLLOWUP_START = "followup_start"
+# By design I am forcing the FOLLOWUP_START to be the inclusion start. This should
+# avoid making time-zero bias errors but might not be super practical.
+
+COLNAME_INTERVENTION_START = "intervention_start"
+COLNAME_INTERVENTION_STATUS = "intervention_status"
 COLNAME_MORTALITY_28D = "mortality_28days"
 COLNAME_MORTALITY_90D = "mortality_90days"
+# delta
+COLNAME_DELTA_MORTALITY = "delta mortality to inclusion"
+COLNAME_DELTA_INTERVENTION_INCLUSION = "delta intervention to inclusion"
+COLNAME_DELTA_INCLUSION_INTIME = "delta inclusion to intime"
+COLNAME_DELTA_INTIME_ADMISSION = "delta ICU intime to hospital admission"
+
 
 # legacy: keep?
 # Expert features
