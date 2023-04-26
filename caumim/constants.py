@@ -63,7 +63,6 @@ COLNAME_INCLUSION_START = "inclusion_start"
 # COLNAME_FOLLOWUP_START = "followup_start"
 # By design I am forcing the FOLLOWUP_START to be the inclusion start. This should
 # avoid making time-zero bias errors but might not be super practical.
-
 COLNAME_INTERVENTION_START = "intervention_start"
 COLNAME_INTERVENTION_STATUS = "intervention_status"
 COLNAME_MORTALITY_28D = "mortality_28days"
@@ -74,6 +73,9 @@ COLNAME_DELTA_INTERVENTION_INCLUSION = "delta intervention to inclusion"
 COLNAME_DELTA_INCLUSION_INTIME = "delta inclusion to intime"
 COLNAME_DELTA_INTIME_ADMISSION = "delta ICU intime to hospital admission"
 
+# Features
+COLNAME_EMERGENCY_ADMISSION = "Emergency admission"
+COLNAME_INSURANCE_MEDICARE = "Insurance, Medicare"
 
 # legacy: keep?
 # Expert features
