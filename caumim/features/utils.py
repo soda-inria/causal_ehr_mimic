@@ -1,4 +1,4 @@
-from typing import List
+from typing import Dict, List
 import polars as pl
 
 from caumim.constants import (
@@ -45,6 +45,27 @@ def get_antibiotics_event_from_atc4(atc4_codes) -> pl.LazyFrame:
         ]
     )
     return antibiotics_event
+
+
+def get_antibiotics_event_from_drug_name(drug_classes: Dict[str, str]):
+    drugs = pl.scan_parquet(DIR2MIMIC / "mimiciv_hosp.prescriptions/*")
+    drug_event_list = []
+    for drug_class_name, drug_medic_names in drug_classes.items():
+        drug_regex = "|".join(drug_medic_names)
+        drug_event_class = drugs.filter(
+            pl.col("drug").str.to_lowercase().str.contains(drug_regex)
+        ).with_columns(
+            [
+                pl.col("stoptime").alias(COLNAME_END),
+                pl.lit("drug").alias(COLNAME_DOMAIN),
+                pl.lit(drug_class_name).alias(COLNAME_CODE),
+                pl.col("drug").alias(COLNAME_LABEL),
+                pl.lit(1).alias(COLNAME_VALUE),
+            ]
+        )
+        drug_event_list.append(drug_event_class)
+    drug_event = pl.concat(drug_event_list)
+    return drug_event
 
 
 def restrict_event_to_observation_period(

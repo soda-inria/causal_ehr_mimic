@@ -4,16 +4,13 @@
 
 ```{eval-rst}
 .. toctree::
-   :hidden:
    :maxdepth: 1
 
    readme
    Usage <usage.md>
    Data <data>
-   Notebooks <notebooks>
    CLI usage <cli-usage>
-   License <license>
-   Changelog <changelog>
+   Target trials <target_trials/index.md>
 ```
 
 ```{eval-rst}

@@ -52,6 +52,8 @@ pygments = { version = "^2.11.2" }
 sphinx = { version = "^6" }
 pydata-sphinx-theme = { version = "^0" }
 sphinx-click = { version = "^4" }
+sphinxcontrib-bibtex = "^2.5.0"
+docutils = "^0.19"
 
 [tool.poetry.group.dev.dependencies]
 # Testing

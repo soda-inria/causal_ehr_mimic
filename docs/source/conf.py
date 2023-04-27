@@ -50,7 +50,11 @@ extensions = [
     "sphinx.ext.autosectionlabel",  # Allow reference sections using its title (https://www.sphinx-doc.org/en/master/usage/extensions/autosectionlabel.html)
     "sphinx.ext.napoleon",  # Support for NumPy and Google style docstrings (https://www.sphinx-doc.org/en/master/usage/extensions/napoleon.html
     "sphinx_click",  # Automatic documentation of click based CLI (https://github.com/click-contrib/sphinx-click)
+    "sphinxcontrib.bibtex",
 ]
+bibtex_bibfiles = ["_static/references.bib"]
+bibtex_default_style = "unsrt"
+bibtex_reference_style = "author_year"
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ["_templates"]

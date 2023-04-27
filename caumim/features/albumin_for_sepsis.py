@@ -16,6 +16,7 @@ from caumim.constants import (
 )
 from caumim.features.utils import (
     get_antibiotics_event_from_atc4,
+    get_antibiotics_event_from_drug_name,
     get_measurement_from_mimic_concept_tables,
     restrict_event_to_observation_period,
 )
@@ -32,18 +33,30 @@ def get_albumin_events_zhou_baseline(target_cohort_folder: str) -> pl.DataFrame:
     # Describe baseline caracteristics
     event_list = []
     # 1 - antibiotics
-    antibiotic_atc = {
-        "J01DH": "Carbapenems",
-        "J01XA": "Glycopeptid",
-        "J01CA": "Beta-lactams penicillins",
-        "J01CE": "Beta-lactamase-sensitive penicillins",
-        "J01CF": "Beta-lactamase-resistant penicillins",
-        "J01CG": "Beta-lactamase inihibitors",
-        "J01CR": "Combinations of penicillins, incl. beta-lactamase inhibitors",
-        "J01GA": "Aminoglycosides - Streptomycins",
-        "J01GB": "Aminoglycosides - Other aminoglycosides",
+    # antibiotic_atc4 = {
+    #     "Carbapenems": ["J01DH"],
+    #     "Glycopeptide": ["J01XA"],
+    #     "Beta-lactams": [
+    #         "J01CA",  # penicillins
+    #         "J01CE"  # "Beta-lactamase-sensitive penicillins",
+    #         "J01CF",  # "Beta-lactamase-resistant penicillins",
+    #         "J01CG",  # "Beta-lactamase inihibitors",
+    #         "J01CR",  # "Combinations of penicillins, incl. beta-lactamase inhibitors",
+    #     ],
+    #     "Aminoglycosides": [
+    #         "J01GA",  # Aminoglycosides - Streptomycins
+    #         "J01GB",  # "Aminoglycosides - Other aminoglycosides"
+    #     ],
+    # }
+    antibiotic_str = {
+        "Carbapenems": ["meropenem"],
+        "Glycopeptide": ["vancomycin"],
+        "Beta-lactams": ["ceftriaxone", "cefotaxime", "cefepime"],
+        "Aminoglycosides": ["gentamicin", "amikacin"],
     }
-    antibiotics_event = get_antibiotics_event_from_atc4(antibiotic_atc.keys())
+    antibiotics_event = get_antibiotics_event_from_drug_name(
+        antibiotic_str
+    )  # get_antibiotics_event_from_atc4(antibiotic_atc.keys())
     # map to ATC4 or ATC3 depending on the antibiotics
     antibiotics_event_renamed_for_study = antibiotics_event.with_columns(
         [
@@ -219,20 +232,20 @@ def get_albumin_events_zhou_baseline(target_cohort_folder: str) -> pl.DataFrame:
         )
     )
 
-    dialysis_event = pl.scan_parquet(
+    rrt_event = pl.scan_parquet(
         DIR2MIMIC / "mimiciv_derived.rrt/"
     ).with_columns(
         pl.lit("procedure").alias(COLNAME_DOMAIN),
         pl.col("charttime").alias(COLNAME_START),
         pl.col("charttime").alias(COLNAME_END),
-        pl.lit("dialysis").alias(COLNAME_CODE),
+        pl.lit("RRT").alias(COLNAME_CODE),
         pl.col("dialysis_type").alias(COLNAME_LABEL),
         pl.col("dialysis_active").alias(COLNAME_VALUE),
     )
     event_list.append(
         restrict_event_to_observation_period(
             target_trial_population=target_trial_population,
-            event=dialysis_event,
+            event=rrt_event,
         )
     )
     # 4 - medications: vasopressors
