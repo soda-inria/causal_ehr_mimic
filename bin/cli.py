@@ -9,7 +9,7 @@ from caumim.acquisition.data_acquisition import (
     convert_mimic_from_duckdb_to_parquet,
 )
 from caumim.constants import LOG_LEVEL
-from caumim.target_population.albumin_for_sepsis import (
+from caumim.framing.albumin_for_sepsis import (
     COHORT_CONFIG_ALBUMIN_FOR_SEPSIS,
     get_population,
 )
@@ -55,7 +55,7 @@ available_populations = ["albumin_for_sepsis"]
     type=click.Choice(available_populations, case_sensitive=False),
     help="Population of interest",
 )
-def build_target_population(target_population: str) -> None:
+def framing(target_population: str) -> None:
     """Build the target population for the study."""
     if target_population == "albumin_for_sepsis":
         get_population(COHORT_CONFIG_ALBUMIN_FOR_SEPSIS)

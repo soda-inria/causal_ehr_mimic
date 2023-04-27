@@ -1,4 +1,5 @@
 import polars as pl
+from sklearn.utils import Bunch
 
 from caumim.constants import (
     COLNAME_CODE,
@@ -14,7 +15,7 @@ from caumim.constants import (
     DIR2MIMIC,
     DIR2RESOURCES,
 )
-from caumim.features.utils import (
+from caumim.variables.utils import (
     get_antibiotics_event_from_atc4,
     get_antibiotics_event_from_drug_name,
     get_measurement_from_mimic_concept_tables,
@@ -23,13 +24,14 @@ from caumim.features.utils import (
 from caumim.utils import to_lazyframe
 
 
-def get_albumin_events_zhou_baseline(target_cohort_folder: str) -> pl.DataFrame:
+def get_albumin_events_zhou_baseline(
+    target_trial_population: pl.DataFrame,
+) -> pl.DataFrame:
     """Get the baseline variables from the [Zhou et al., 2021](https://link.springer.com/article/10.1186/s13613-021-00830-8) paper.
 
     Returns:
         pl.DataFrame: Events in the observation period (before followup), for the target trial population.
     """
-    target_trial_population = pl.read_parquet(str(target_cohort_folder))
     # Describe baseline caracteristics
     event_list = []
     # 1 - antibiotics
@@ -273,6 +275,10 @@ def get_albumin_events_zhou_baseline(target_cohort_folder: str) -> pl.DataFrame:
         .with_columns(
             pl.lit("medication").alias(COLNAME_DOMAIN),
             pl.lit("vasopressors").alias(COLNAME_CODE),
+            pl.when(pl.col(COLNAME_VALUE) > 0)
+            .then(1)
+            .otherwise(0)
+            .alias(COLNAME_VALUE),
         )
     )
     event_list.append(
@@ -309,4 +315,33 @@ def get_albumin_events_zhou_baseline(target_cohort_folder: str) -> pl.DataFrame:
     event_features = pl.concat(event_list).collect()
     # Restrict to cohort and observation period (before inclusion start)
     event_features = event_features.filter(~event_features.is_duplicated())
-    return event_features
+
+    # Add feature types
+    feature_types = Bunch(
+        **{
+            "binary_features": [
+                "Glycopeptide",  # J01XA
+                "Beta-lactams",  # "J01C",
+                "Carbapenems",  # "J01DH",
+                "Aminoglycosides",  # "J01G",
+                "suspected_infection_blood",
+                "RRT",
+                "ventilation",
+                "vasopressors",
+            ],
+            "categorical_features": ["aki_stage"],
+            "numerical_features": [
+                "SOFA",
+                "SAPSII",
+                "Weight",
+                "temperature",
+                "mbp",
+                "resp_rate",
+                "heart_rate",
+                "spo2",
+                "lactate",
+                "urineoutput",
+            ],
+        }
+    )
+    return event_features, feature_types

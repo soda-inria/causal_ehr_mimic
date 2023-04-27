@@ -6,7 +6,7 @@ in the MIMIC-IV database.
 %reload_ext autoreload
 %autoreload 2
 import numpy as np
-from caumim.target_population.utils import get_base_population, get_flat_information, get_drug_names_from_str
+from caumim.framing.utils import get_base_population, get_flat_information, get_drug_names_from_str
 from caumim.constants import *
 import polars as pl
 import pandas as pd

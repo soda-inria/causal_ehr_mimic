@@ -8,7 +8,7 @@ in the MIMIC-IV database.
 from copy import deepcopy
 
 import numpy as np
-from caumim.target_population.utils import get_base_population
+from caumim.framing.utils import get_base_population
 from caumim.constants import *
 import polars as pl
 import pandas as pd

@@ -32,7 +32,7 @@ import numpy as np
 import pandas as pd
 import polars as pl
 
-from caumim.target_population.utils import (
+from caumim.framing.utils import (
     get_flat_information,
     add_inhospital_mortality_to_icustays,
     add_inunit_mortality_to_icustays,

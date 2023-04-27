@@ -25,7 +25,7 @@ classifiers = [
 # Changelog = "https://gitlab.com/strayMat/caumim/releases"
 
 [tool.poetry.dependencies]
-python = "^3.8"
+python = ">=3.8,<3.11"
 
 # Project-Specific
 python-dotenv = "^0.20.0"
@@ -35,7 +35,8 @@ polars = "^0.17.2"
 ipdb = "^0.13.13"
 loguru = "^0.7.0"
 connectorx = ">=0.2.0a3"
-scikit-learn = "^1.2.2"
+scikit-learn = "<1.2.0"
+
 [tool.poetry.group.notebooks.dependencies]
 # Jupyter Notebook
 jupyter = "^1.0.0"
@@ -49,7 +50,7 @@ optional = true
 importlib-metadata = { version = "^6" }
 myst-parser = { version = "^1" }
 pygments = { version = "^2.11.2" }
-sphinx = { version = "^6" }
+sphinx = { version = ">=4,<6" }
 pydata-sphinx-theme = { version = "^0" }
 sphinx-click = { version = "^4" }
 sphinxcontrib-bibtex = "^2.5.0"

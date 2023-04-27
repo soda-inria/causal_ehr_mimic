@@ -13,7 +13,7 @@ from caumim.constants import (
 )
 from loguru import logger
 
-from caumim.target_population.utils import (
+from caumim.framing.utils import (
     create_cohort_folder,
     get_base_population,
     get_cohort_hash,
@@ -146,9 +146,11 @@ def get_population(cohort_config):
         how="left",
     )
 
-    target_trial_population[
-        COLNAME_INTERVENTION_STATUS
-    ] = target_trial_population[COLNAME_INTERVENTION_START].notnull()
+    target_trial_population[COLNAME_INTERVENTION_STATUS] = (
+        target_trial_population[COLNAME_INTERVENTION_START]
+        .notnull()
+        .astype(int)
+    )
 
     # 5 - Define outcomes
     # 28-days and 90-days mortality

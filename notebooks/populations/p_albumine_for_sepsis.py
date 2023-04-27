@@ -6,13 +6,13 @@ in the MIMIC-IV database.
 %reload_ext autoreload
 %autoreload 2
 import numpy as np
-from caumim.target_population.utils import create_cohort_folder, get_base_population, roll_inclusion_criteria
+from caumim.framing.utils import create_cohort_folder, get_base_population, roll_inclusion_criteria
 from caumim.constants import *
 import polars as pl
 import pandas as pd
 from sklearn.utils import Bunch
 from datetime import datetime
-from caumim.target_population.albumin_for_sepsis import COHORT_CONFIG_ALBUMIN_FOR_SEPSIS
+from caumim.framing.albumin_for_sepsis import COHORT_CONFIG_ALBUMIN_FOR_SEPSIS
 from caumim.utils import to_lazyframe
 pd.set_option("display.max_columns", None)
 pd.set_option("display.max_colwidth", 100)

@@ -57,6 +57,8 @@ COLNAMES_EVENTS = [
     COLNAME_LABEL,
     COLNAME_VALUE,
 ]
+STAY_KEYS = [COLNAME_PATIENT_ID, COLNAME_ICUSTAY_ID, COLNAME_HADM_ID]
+
 
 # Other Colnames
 COLNAME_INCLUSION_START = "inclusion_start"
@@ -76,6 +78,11 @@ COLNAME_DELTA_INTIME_ADMISSION = "delta ICU intime to hospital admission"
 # Features
 COLNAME_EMERGENCY_ADMISSION = "Emergency admission"
 COLNAME_INSURANCE_MEDICARE = "Insurance, Medicare"
+
+# Results columns
+RESULT_ATE = "ATE"
+RESULT_ATE_LB = "ATE lower bound"
+RESULT_ATE_UB = "ATE upper bound"
 
 # legacy: keep?
 # Expert features
