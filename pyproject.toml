@@ -36,6 +36,12 @@ ipdb = "^0.13.13"
 loguru = "^0.7.0"
 connectorx = ">=0.2.0a3"
 scikit-learn = "<1.2.0"
+matplotlib = "^3.7.1"
+seaborn = "^0.12.2"
+zepid = "^0.9.1"
+numpy = "1.23.5"
+forestplot = "^0.3.1"
+dowhy = "^0.9.1"
 
 [tool.poetry.group.notebooks.dependencies]
 # Jupyter Notebook

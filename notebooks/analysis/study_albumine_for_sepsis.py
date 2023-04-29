@@ -5,6 +5,7 @@ import numpy as np
 from caumim.constants import *
 from caumim.framing.albumin_for_sepsis import COHORT_CONFIG_ALBUMIN_FOR_SEPSIS
 from caumim.framing.utils import create_cohort_folder
+from caumim.inference.estimation import ESTIMATOR_RF, ESTIMATOR_LR
 
 from caumim.variables.selection import get_albumin_events_zhou_baseline
 from caumim.variables.utils import (
@@ -17,7 +18,8 @@ from sklearn.compose import ColumnTransformer
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from sklearn.impute import SimpleImputer
 from sklearn.pipeline import make_pipeline
-from sklearn.linear_model import LogisticRegression
+from sklearn.linear_model import LogisticRegression, Ridge
+
 
 # %%
 # 1 - Framing
@@ -67,9 +69,8 @@ patient_features_last = event_features.sort(
     index=STAY_KEYS,
     columns=COLNAME_CODE,
     values="value",
-    aggregate_function=pl.element().first(),
+    aggregate_function=pl.element().median(),
 )
-# %%
 event_features_names = list(
     set(patient_features_last.columns).difference(set(STAY_KEYS))
 )
@@ -113,7 +114,6 @@ numerical_features = list(
 )
 X[binary_features] = X[binary_features].fillna(value=0)
 
-# %%
 # 3 - Identification
 model = CausalModel(
     data=X,
@@ -124,13 +124,13 @@ model = CausalModel(
 # model.view_model(size=(15, 15))
 # from IPython.display import Image, display
 # display(Image(filename=cohort_folder / "causal_model.png"))
-# %%
+
 identified_estimand = model.identify_effect(
     optimize_backdoor=True, proceed_when_unidentifiable=True
 )
-print(identified_estimand)
+# print(identified_estimand)
 # note: long to run on 22 variables if not forcing optimize_backdoor.
-# %%
+
 # 4 - Estimation
 
 categorical_preprocessor = OneHotEncoder(handle_unknown="ignore")
@@ -156,18 +156,38 @@ column_transformer = ColumnTransformer(
     remainder="passthrough",
     # The passthrough is necessary for all the event features.
 )
-treatment_model = make_pipeline(*[column_transformer, LogisticRegression()])
+from sklearn.model_selection import RandomizedSearchCV
+from sklearn.pipeline import Pipeline
+
+treatment_estimator = ESTIMATOR_LR
+
+treatment_pipeline = RandomizedSearchCV(
+    Pipeline(
+        [
+            ("preprocessor", column_transformer),
+            ("treatment_estimator", treatment_estimator["treatment_estimator"]),
+        ]
+    ),
+    param_distributions=treatment_estimator["treatment_estimator_kwargs"],
+    random_state=42,
+)
+
+# treatment_model.fit(
+#     X.drop([COLNAME_INTERVENTION_STATUS, outcome_name], axis=1),
+#     X[COLNAME_INTERVENTION_STATUS],
+# )
 outcome_model = None
-#  %%
+# treatment_pipeline = make_pipeline(*[column_transformer, treatment_estimator])
 estimate = model.estimate_effect(
     identified_estimand,
     method_name="backdoor.propensity_score_weighting",
     method_params={
-        "propensity_score_model": treatment_model,
-        "min_ps_score": 0.05,
-        "max_ps_score": 0.95,
+        "propensity_score_model": treatment_pipeline,
+        "min_ps_score": 0.001,
+        "max_ps_score": 0.999,
+        # "outcome_model": outcome_model,
     },
-    confidence_intervals=True,
+    confidence_intervals=False,
 )
 lower_bound, upper_bound = estimate.get_confidence_intervals()
 results = {}
@@ -175,7 +195,68 @@ results[RESULT_ATE] = estimate.value
 results[RESULT_ATE_LB] = lower_bound
 results[RESULT_ATE_UB] = upper_bound
 results
+# %%
+from sklearn.ensemble import GradientBoostingRegressor
+from sklearn.multioutput import MultiOutputRegressor
+from econml.dml import LinearDML
 
+outcome_model = make_pipeline(*[column_transformer, LogisticRegression()])
+treatment_pipeline = make_pipeline(*[column_transformer, LogisticRegression()])
+
+est = LinearDML(
+    model_y=outcome_model,
+    model_t=treatment_pipeline,
+    featurizer=column_transformer,
+    linear_first_stages=False,
+    cv=5,
+)
+est.fit(
+    X[outcome_name],
+    X[COLNAME_INTERVENTION_STATUS],
+    X=X.drop([COLNAME_INTERVENTION_STATUS, outcome_name], axis=1),
+)
+# %% TLearner does not work since it does not support the pipeline, so I can't
+# use it properly (eg. with a CV)
+from sklearn.ensemble import (
+    RandomForestClassifier,
+    HistGradientBoostingClassifier,
+)
+
+outcome_model = make_pipeline(*[column_transformer, LogisticRegression()])
+# outcome_model = HistGradientBoostingClassifier()
+estimate = model.estimate_effect(
+    identified_estimand,
+    method_name="backdoor.econml.metalearners.TLearner",
+    method_params={
+        "init_params": {"models": outcome_model},
+        "fit_params": {},
+    },
+    confidence_intervals=False,
+)
+lower_bound, upper_bound = estimate.get_confidence_intervals()
+results = {}
+results[RESULT_ATE] = estimate.value
+results[RESULT_ATE_LB] = lower_bound
+results[RESULT_ATE_UB] = upper_bound
+results
+# %%
+from econml.metalearners import TLearner
+
+c_estimator = TLearner(
+    models=outcome_model,
+)
+transformed_data = column_transformer.fit_transform(
+    X.drop([COLNAME_INTERVENTION_STATUS, outcome_name], axis=1),
+)
+transformed_data = pd.DataFrame(
+    transformed_data, columns=column_transformer.get_feature_names_out()
+)
+c_estimator.fit(
+    X[outcome_name],
+    X[COLNAME_INTERVENTION_STATUS],
+    X=X.drop([COLNAME_INTERVENTION_STATUS, outcome_name], axis=1),
+)
+# %%
 # Refute/Test hypothesis.
 interpretation = causal_estimate_ipw.interpret(
     method_name="confounder_distribution_interpreter",

@@ -1,3 +1,4 @@
+from typing import Tuple
 import polars as pl
 from sklearn.utils import Bunch
 
@@ -23,10 +24,16 @@ from caumim.variables.utils import (
 )
 from caumim.utils import to_lazyframe
 
+from joblib import Memory
 
+location = "./cachedir"
+memory = Memory(location, verbose=0)
+
+
+@memory.cache()
 def get_albumin_events_zhou_baseline(
     target_trial_population: pl.DataFrame,
-) -> pl.DataFrame:
+) -> Tuple[pl.DataFrame, Bunch]:
     """Get the baseline variables from the [Zhou et al., 2021](https://link.springer.com/article/10.1186/s13613-021-00830-8) paper.
 
     Returns:
