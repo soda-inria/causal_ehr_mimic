@@ -42,6 +42,7 @@ zepid = "^0.9.1"
 numpy = "1.23.5"
 forestplot = "^0.3.1"
 dowhy = "^0.9.1"
+cython = "^0.29.34"
 
 [tool.poetry.group.notebooks.dependencies]
 # Jupyter Notebook
@@ -92,6 +93,7 @@ pyupgrade = "^3.3.1"
 yamllint = "1.29.0"
 ## various convenient hooks
 pre-commit-hooks = "^4.4.0"
+py-spy = "^0.3.14"
 
 [tool.poetry.scripts]
 cli = "bin.cli:cli"

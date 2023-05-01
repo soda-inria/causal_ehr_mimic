@@ -1,11 +1,5 @@
 # Usage
 
-## Requirements
-
-- TODO
-
-
-
 # Installation
 
 You can install Caumim via [pip](https://pip.pypa.io/):
@@ -14,9 +8,9 @@ You can install Caumim via [pip](https://pip.pypa.io/):
 pip install caumim
 ```
 
-# Using the project
+## Installation issues
 
-- TODO
+- causalml is not successfully installed with poetry, use `poetry run pip install causalml` instead. 
 
 ## Running the project
 

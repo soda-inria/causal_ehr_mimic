@@ -33,7 +33,7 @@ config = Bunch(
             "event_aggregations": [
                 # [pl.min(), pl.max()],
                 # [pl.first()],
-                pl.element().first(),
+                # pl.element().first(),
                 pl.element().last(),
                 pl.element().median(),
             ],

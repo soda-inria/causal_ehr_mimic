@@ -2,6 +2,7 @@
 import polars as pl
 import pandas as pd
 import numpy as np
+from sklearn import clone
 from caumim.constants import *
 from caumim.framing.albumin_for_sepsis import COHORT_CONFIG_ALBUMIN_FOR_SEPSIS
 from caumim.framing.utils import create_cohort_folder
@@ -113,6 +114,8 @@ numerical_features = list(
     )
 )
 X[binary_features] = X[binary_features].fillna(value=0)
+# %%
+# from causalml.inference.meta import BaseXRegressor
 
 # 3 - Identification
 model = CausalModel(
@@ -171,18 +174,14 @@ treatment_pipeline = RandomizedSearchCV(
     param_distributions=treatment_estimator["treatment_estimator_kwargs"],
     random_state=42,
 )
-
-# treatment_model.fit(
-#     X.drop([COLNAME_INTERVENTION_STATUS, outcome_name], axis=1),
-#     X[COLNAME_INTERVENTION_STATUS],
-# )
+## dowhy propensity score weighting
 outcome_model = None
 # treatment_pipeline = make_pipeline(*[column_transformer, treatment_estimator])
 estimate = model.estimate_effect(
     identified_estimand,
     method_name="backdoor.propensity_score_weighting",
     method_params={
-        "propensity_score_model": treatment_pipeline,
+        "propensity_score_model": clone(treatment_pipeline),
         "min_ps_score": 0.001,
         "max_ps_score": 0.999,
         # "outcome_model": outcome_model,
@@ -195,15 +194,16 @@ results[RESULT_ATE] = estimate.value
 results[RESULT_ATE_LB] = lower_bound
 results[RESULT_ATE_UB] = upper_bound
 results
+
 # %%
-from sklearn.ensemble import GradientBoostingRegressor
-from sklearn.multioutput import MultiOutputRegressor
-from econml.dml import LinearDML
+## caussim propensity score
+from caumim.inference.estimation import AteEstimator
 
-outcome_model = make_pipeline(*[column_transformer, LogisticRegression()])
-treatment_pipeline = make_pipeline(*[column_transformer, LogisticRegression()])
+outcome_model = None
+treatment_pipeline = clone(treatment_pipeline)
 
-est = LinearDML(
+est = CateEstimator(
+    meta_learner=TLearner,
     model_y=outcome_model,
     model_t=treatment_pipeline,
     featurizer=column_transformer,
