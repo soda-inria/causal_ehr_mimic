@@ -2,11 +2,12 @@
 import polars as pl
 import pandas as pd
 import numpy as np
-from sklearn import clone
+from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 from caumim.constants import *
+from caumim.experiments.utils import make_column_transformer
 from caumim.framing.albumin_for_sepsis import COHORT_CONFIG_ALBUMIN_FOR_SEPSIS
 from caumim.framing.utils import create_cohort_folder
-from caumim.inference.estimation import ESTIMATOR_RF, ESTIMATOR_LR
+from caumim.inference.utils import make_random_search_pipeline
 
 from caumim.variables.selection import get_albumin_events_zhou_baseline
 from caumim.variables.utils import (
@@ -14,13 +15,13 @@ from caumim.variables.utils import (
     feature_insurance_medicare,
 )
 
-from dowhy import CausalModel
-from sklearn.compose import ColumnTransformer
-from sklearn.preprocessing import OneHotEncoder, StandardScaler
-from sklearn.impute import SimpleImputer
+from sklearn import clone
 from sklearn.pipeline import make_pipeline
-from sklearn.linear_model import LogisticRegression, Ridge
+from sklearn.linear_model import LassoCV, LogisticRegression, Ridge
+from sklearn.model_selection import RandomizedSearchCV
 
+from dowhy import CausalModel
+from caumim.inference.estimation import AteEstimator, CateEstimator
 
 # %%
 # 1 - Framing
@@ -64,19 +65,18 @@ event_features, feature_types = get_albumin_events_zhou_baseline(
     target_trial_population
 )
 # %%
-patient_features_last = event_features.sort(
+patient_features_aggregated = event_features.sort(
     [COLNAME_PATIENT_ID, COLNAME_START]
 ).pivot(
     index=STAY_KEYS,
     columns=COLNAME_CODE,
     values="value",
-    aggregate_function=pl.element().median(),
+    aggregate_function=pl.element().last(),
 )
 event_features_names = list(
-    set(patient_features_last.columns).difference(set(STAY_KEYS))
+    set(patient_features_aggregated.columns).difference(set(STAY_KEYS))
 )
-
-X = patient_features_last.join(
+X = patient_features_aggregated.join(
     target_trial_population,
     on=STAY_KEYS,
     how="inner",
@@ -89,147 +89,143 @@ X = patient_features_last.join(
     ]
 ].to_pandas()
 
-binary_features = [
-    "Glycopeptide",  # J01XA
-    "Beta-lactams",  # "J01C",
-    "Carbapenems",  # "J01DH",
-    "Aminoglycosides",  # "J01G",
-    "suspected_infection_blood",
-    "RRT",
-    "ventilation",
-    COLNAME_EMERGENCY_ADMISSION,
-    COLNAME_INSURANCE_MEDICARE,
-]
-categorical_features = ["aki_stage"]
-numerical_features = list(
-    X.columns.difference(
-        set(
-            [
-                *binary_features,
-                *categorical_features,
-                outcome_name,
-                COLNAME_INTERVENTION_STATUS,
-            ]
-        )
-    )
+X[feature_types.binary_features] = X[feature_types.binary_features].fillna(
+    value=0
 )
-X[binary_features] = X[binary_features].fillna(value=0)
-# %%
-# from causalml.inference.meta import BaseXRegressor
+column_transformer = make_column_transformer(
+    numerical_features=feature_types.numerical_features,
+    categorical_features=feature_types.categorical_features,
+)
+# preview the feature preprocessing (imputation, categories handling and standardization)
+column_transformer_preview = clone(column_transformer)
+transformed_features_preview = column_transformer_preview.fit_transform(X)
+transformed_features_preview = pd.DataFrame(
+    transformed_features_preview,
+    columns=column_transformer_preview.get_feature_names_out(),
+)
+transformed_features_preview.head()
+# %% [markdown] Are we happy with the features preprocessing ? Note that the
+# column_transformer should be apply in a sklearn.pipeline for the treatment or
+# the outcome models in order to avoid information leakage.
 
-# 3 - Identification
+# 3 - Identification and Estimation
+
+## Let's take an identification and an estimation method
+# To keep it simple, we will use a regularized logistic/linear regressions for both
+# the treatment and outcome models, and will vary the identification methods.
+# %%
+from caumim.experiments.configurations import ESTIMATOR_RIDGE, ESTIMATOR_RF
+
+estimator = ESTIMATOR_RF
+# %% [markdown] Because, there is some hyper-parameters to choose, we will use a
+# random search to find the best hyper-parameters for our dataset, as
+# recommended by [Bouthillier et al., 2021](https://arxiv.org/pdf/2103.03098.pdf). Then, for the
+# different identification methods, we will reuse these hyper-parameters to fit
+# the nuisance models of the outcome and the treatment.
+
+treatment_pipeline = make_random_search_pipeline(
+    estimator=estimator["treatment_estimator"],
+    column_transformer=column_transformer,
+    param_distributions=estimator["treatment_param_distributions"],
+)
+treatment_pipeline
+# %%
+outcome_pipeline = make_random_search_pipeline(
+    estimator=estimator["outcome_estimator"],
+    column_transformer=column_transformer,
+    param_distributions=estimator["outcome_param_distributions"],
+)
+outcome_pipeline
+# %%
+a = X[COLNAME_INTERVENTION_STATUS]
+y = X[outcome_name]
+treatment_pipeline.fit(X, a)
+treatment_estimator_w_best_HP = treatment_pipeline.best_estimator_
+outcome_pipeline.fit(X, y)
+outcome_estimator_w_best_HP = outcome_pipeline.best_estimator_
+# %%
+# ### G-computation with T-learner
+from econml.metalearners import TLearner
+from econml.inference import BootstrapInference
+
+# NB: econml methods does not support missing data in the inputs, so we'll
+# have to preprocess the data before fitting to the estimator. A practice to be
+# avoided usually, because it can lead to [information leakage](https://en.wikipedia.org/wiki/Leakage_(machine_learning)).
+X_transformed = column_transformer.fit_transform(
+    X.drop([COLNAME_INTERVENTION_STATUS, outcome_name], axis=1)
+)
+X_transformed = pd.DataFrame(
+    X_transformed, columns=column_transformer.get_feature_names_out()
+)
+t_learner = TLearner(
+    models=[
+        outcome_estimator_w_best_HP.named_steps["estimator"],
+        outcome_estimator_w_best_HP.named_steps["estimator"],
+    ]
+)
+# The bootstrap inference method allows to compute CI for non-parametric estimators.
+# However, it is computationally expensive and some doubts have been casted on the .
+t_learner.fit(
+    y, a, X=X_transformed, inference=BootstrapInference(n_bootstrap_samples=10)
+)
+results = {}
+ate_inference = t_learner.ate_inference(X=X_transformed)
+results[RESULT_ATE] = ate_inference.mean_point
+results[RESULT_ATE_LB], results[RESULT_ATE_UB] = ate_inference.conf_int_mean()
+results
+# These are big error bounds: a hint indicating that we should not trust this T-learner.
+# %% [markdown]
+# ### AIPW estimator with doubly-robust inference
+# %%
+from econml.dr import LinearDRLearner
+
+dr_learner = LinearDRLearner(
+    model_propensity=treatment_estimator_w_best_HP.named_steps["estimator"],
+    model_regression=outcome_estimator_w_best_HP.named_steps["estimator"],
+    min_propensity=0.001,
+    cv=5,
+)
+dr_learner.fit(
+    y,
+    a,
+    X=None,
+    W=X_transformed,
+    inference=BootstrapInference(n_bootstrap_samples=10),
+)
+results = {}
+ate_inference = dr_learner.ate_inference(X=None)
+results[RESULT_ATE] = ate_inference.mean_point
+results[RESULT_ATE_LB], results[RESULT_ATE_UB] = ate_inference.conf_int_mean()
+results
+
+# %% [markdown]
+## With dowhy
+
+# I find the package a bit too complicated if we are solely interested in ate
+# estimation, but it implements a IPW out of box (which could overfit though because not fitted by crossvaldaito).
+#  %%
+dowhy_X = pd.concat([X_transformed, a, y], axis=1)
+common_causes = list(
+    dowhy_X.columns.drop([outcome_name, COLNAME_INTERVENTION_STATUS])
+)
 model = CausalModel(
-    data=X,
+    data=dowhy_X,
     treatment=COLNAME_INTERVENTION_STATUS,
     outcome=outcome_name,
-    common_causes=[*event_features_names, *static_features],
+    common_causes=common_causes,
 )
-# model.view_model(size=(15, 15))
-# from IPython.display import Image, display
-# display(Image(filename=cohort_folder / "causal_model.png"))
-
 identified_estimand = model.identify_effect(
     optimize_backdoor=True, proceed_when_unidentifiable=True
 )
-# print(identified_estimand)
-# note: long to run on 22 variables if not forcing optimize_backdoor.
 
-# 4 - Estimation
-
-categorical_preprocessor = OneHotEncoder(handle_unknown="ignore")
-numerical_preprocessor = make_pipeline(
-    *[
-        SimpleImputer(strategy="mean"),
-        StandardScaler(),
-    ]
-)
-column_transformer = ColumnTransformer(
-    [
-        (
-            "one-hot-encoder",
-            categorical_preprocessor,
-            categorical_features,
-        ),
-        (
-            "standard_scaler",
-            numerical_preprocessor,
-            numerical_features,
-        ),
-    ],
-    remainder="passthrough",
-    # The passthrough is necessary for all the event features.
-)
-from sklearn.model_selection import RandomizedSearchCV
-from sklearn.pipeline import Pipeline
-
-treatment_estimator = ESTIMATOR_LR
-
-treatment_pipeline = RandomizedSearchCV(
-    Pipeline(
-        [
-            ("preprocessor", column_transformer),
-            ("treatment_estimator", treatment_estimator["treatment_estimator"]),
-        ]
-    ),
-    param_distributions=treatment_estimator["treatment_estimator_kwargs"],
-    random_state=42,
-)
-## dowhy propensity score weighting
-outcome_model = None
 # treatment_pipeline = make_pipeline(*[column_transformer, treatment_estimator])
 estimate = model.estimate_effect(
     identified_estimand,
     method_name="backdoor.propensity_score_weighting",
     method_params={
-        "propensity_score_model": clone(treatment_pipeline),
+        "propensity_score_model": treatment_estimator_w_best_HP["estimator"],
         "min_ps_score": 0.001,
         "max_ps_score": 0.999,
-        # "outcome_model": outcome_model,
-    },
-    confidence_intervals=False,
-)
-lower_bound, upper_bound = estimate.get_confidence_intervals()
-results = {}
-results[RESULT_ATE] = estimate.value
-results[RESULT_ATE_LB] = lower_bound
-results[RESULT_ATE_UB] = upper_bound
-results
-
-# %%
-## caussim propensity score
-from caumim.inference.estimation import AteEstimator
-
-outcome_model = None
-treatment_pipeline = clone(treatment_pipeline)
-
-est = CateEstimator(
-    meta_learner=TLearner,
-    model_y=outcome_model,
-    model_t=treatment_pipeline,
-    featurizer=column_transformer,
-    linear_first_stages=False,
-    cv=5,
-)
-est.fit(
-    X[outcome_name],
-    X[COLNAME_INTERVENTION_STATUS],
-    X=X.drop([COLNAME_INTERVENTION_STATUS, outcome_name], axis=1),
-)
-# %% TLearner does not work since it does not support the pipeline, so I can't
-# use it properly (eg. with a CV)
-from sklearn.ensemble import (
-    RandomForestClassifier,
-    HistGradientBoostingClassifier,
-)
-
-outcome_model = make_pipeline(*[column_transformer, LogisticRegression()])
-# outcome_model = HistGradientBoostingClassifier()
-estimate = model.estimate_effect(
-    identified_estimand,
-    method_name="backdoor.econml.metalearners.TLearner",
-    method_params={
-        "init_params": {"models": outcome_model},
-        "fit_params": {},
     },
     confidence_intervals=False,
 )
@@ -240,40 +236,68 @@ results[RESULT_ATE_LB] = lower_bound
 results[RESULT_ATE_UB] = upper_bound
 results
 # %%
-from econml.metalearners import TLearner
+# Use a Causal Forest
+from econml.grf import CausalForest
 
-c_estimator = TLearner(
-    models=outcome_model,
-)
 transformed_data = column_transformer.fit_transform(
     X.drop([COLNAME_INTERVENTION_STATUS, outcome_name], axis=1),
 )
 transformed_data = pd.DataFrame(
     transformed_data, columns=column_transformer.get_feature_names_out()
 )
-c_estimator.fit(
-    X[outcome_name],
-    X[COLNAME_INTERVENTION_STATUS],
-    X=X.drop([COLNAME_INTERVENTION_STATUS, outcome_name], axis=1),
+forest_learner = CausalForest()
+forest_learner.fit(
+    X=transformed_data,
+    y=X[outcome_name],
+    T=X[COLNAME_INTERVENTION_STATUS],
 )
+(
+    ate_point_estimates,
+    lb_point_estimates,
+    ub_point_estimates,
+) = forest_learner.predict(X=transformed_data, interval=True)
+results = {}
+results[RESULT_ATE] = ate_point_estimates.mean()
+results[RESULT_ATE_LB] = lb_point_estimates.mean()
+results[RESULT_ATE_UB] = ub_point_estimates.mean()
+results
 # %%
-# Refute/Test hypothesis.
-interpretation = causal_estimate_ipw.interpret(
-    method_name="confounder_distribution_interpreter",
-    fig_size=(8, 8),
-    font_size=12,
-    var_name="W4",
-    var_type="discrete",
+# Ortho-learner
+from econml.dml import LinearDML
+
+dml_learner = LinearDML(
+    model_t=treatment_estimator_w_best_HP["estimator"],
+    model_y=outcome_estimator_w_best_HP["estimator"],
+    # min_propensity=0.001,
+    discrete_treatment=True,
+    cv=5,
 )
+dml_learner.fit(
+    y,
+    a,
+    X=None,
+    W=X_transformed,
+    inference=BootstrapInference(n_bootstrap_samples=10),
+)
+results = {}
+ate_inference = dr_learner.ate_inference(X=None)
+results[RESULT_ATE] = ate_inference.mean_point
+results[RESULT_ATE_LB], results[RESULT_ATE_UB] = ate_inference.conf_int_mean()
+results
+
 # %%
 # Naive DM estimate:
 from zepid import RiskDifference
 
+# The bound returned are the worst cases scenario from the [Fréchet-Boole
+# inequalities](http://causality.cs.ucla.edu/blog/index.php/2019/11/05/frechet-inequalities/).
+# Any estimator having larger bound than the naive DM estimator should not be
+# reliable.
 dm = RiskDifference()
 dm.fit(X, COLNAME_INTERVENTION_STATUS, outcome_name)
-# dm.summary()
 dm_results = {
     RESULT_ATE: dm.results.RiskDifference[1],
-    RESULT_ATE_LB: dm.results.RiskDifference[1],
-    RESULT_ATE_UB: dm.results.RiskDifference[1],
+    RESULT_ATE_LB: dm.results.LowerBound[1],
+    RESULT_ATE_UB: dm.results.UpperBound[1],
 }
+dm_results

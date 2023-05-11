@@ -11,6 +11,7 @@ pip install caumim
 ## Installation issues
 
 - causalml is not successfully installed with poetry, use `poetry run pip install causalml` instead. 
+- causalml downgrade sklearn to <=1.0.2 (December 2021). Whereas, we need sklearn>=1.1.3 for proper handling of column name in Imputers.
 
 ## Running the project
 

@@ -69,9 +69,16 @@ print(deltas[["count", "50%", "IR"]])
 # %%
 # Variable selection
 # Get baseline events
-event_features = get_albumin_events_zhou_baseline(
-    albumin_cohort_folder / FILENAME_TARGET_POPULATION
+event_features, feature_types = get_albumin_events_zhou_baseline(
+    pd.read_parquet(albumin_cohort_folder / FILENAME_TARGET_POPULATION)
 )
+feature_types["binary_features"] += [
+    "Female",
+    "Emergency admission",
+    "Insurance, Medicare",
+]
+feature_types["numerical_features"] += ["admission_age"]
+
 print(event_features.shape)
 event_features["code"].value_counts().sort("counts", descending=True)
 # %% Variable aggregation
@@ -108,43 +115,15 @@ patient_full_features = patient_features_last.join(
     how="inner",
 ).to_pandas()
 
-BINARY_FEATURES = [
-    "Glycopeptide",  # J01XA
-    "Beta-lactams",  # "J01C",
-    "Carbapenems",  # "J01DH",
-    "Aminoglycosides",  # "J01G",
-    "suspected_infection_blood",
-    "RRT",
-    "ventilation",
-    COLNAME_EMERGENCY_ADMISSION,
-    COLNAME_INSURANCE_MEDICARE,
-]
-CATEGORICAL_FEATURES = ["aki_stage"]
-# dialysis needs a bit of rework
-NUMERICAL_FEATURES = list(
-    set(patient_full_features.columns).difference(
-        set(
-            [
-                *BINARY_FEATURES,
-                *CATEGORICAL_FEATURES,
-                COLNAME_INCLUSION_START,
-                COLNAME_INTERVENTION_STATUS,
-                COLNAME_MORTALITY_28D,
-                COLNAME_MORTALITY_90D,
-                *STAY_KEYS,
-                *COMMON_DELTAS,
-            ]
-        )
-    )
-)
+
 # %%
 # save the features
 patient_matrix = patient_full_features[
     [
         COLNAME_PATIENT_ID,
-        *NUMERICAL_FEATURES,
-        *CATEGORICAL_FEATURES,
-        *BINARY_FEATURES,
+        *feature_types["binary_features"],
+        *feature_types["categorical_features"],
+        *feature_types["numerical_features"],
         COLNAME_MORTALITY_28D,
         COLNAME_MORTALITY_90D,
         COLNAME_INTERVENTION_STATUS,
@@ -153,15 +132,17 @@ patient_matrix = patient_full_features[
 # %% [markdown]
 # ## Table 1
 # %%
-for col in BINARY_FEATURES:
+for col in feature_types["binary_features"]:
     patient_full_features[col] = patient_full_features[col].fillna(0)
 
 from sklearn.preprocessing import OneHotEncoder
 
 categorical_features_one_hot = []
-for cat_col in CATEGORICAL_FEATURES:
-    enc = OneHotEncoder(sparse_output=False)
-    categorical_encode = enc.fit_transform(patient_full_features[[cat_col]])
+for cat_col in feature_types["categorical_features"]:
+    enc = OneHotEncoder()
+    categorical_encode = enc.fit_transform(
+        patient_full_features[[cat_col]]
+    ).todense()
     categorical_encode = pd.DataFrame(
         categorical_encode,
         columns=[
@@ -174,13 +155,13 @@ for cat_col in CATEGORICAL_FEATURES:
     )
 categorical_features_one_hot += categorical_encode.columns.tolist()
 # %%
-table_1 = (
+"""table_1 = (
     patient_full_features[
         [
             COLNAME_INTERVENTION_STATUS,
-            *BINARY_FEATURES,
+            *feature_types["binary_features"],
             *categorical_features_one_hot,
-            *NUMERICAL_FEATURES,
+            *feature_types["numerical_features"],
             *COMMON_DELTAS,
         ]
     ]
@@ -188,4 +169,45 @@ table_1 = (
     .mean()
     .transpose()
 )
-table_1
+table_1"""
+
+from tableone import TableOne
+
+# To avoid plotting both category for binary features:
+limit_binary = {
+    k: 1
+    for k in [*feature_types["binary_features"], *categorical_features_one_hot]
+}
+mytable = TableOne(
+    patient_full_features[
+        [
+            COLNAME_INTERVENTION_STATUS,
+            *feature_types["binary_features"],
+            *categorical_features_one_hot,
+            *feature_types["numerical_features"],
+            *COMMON_DELTAS,
+        ]
+    ],
+    categorical=[
+        *feature_types["binary_features"],
+        *categorical_features_one_hot,
+    ],
+    limit=limit_binary,
+    groupby=COLNAME_INTERVENTION_STATUS,
+)
+cohort_name = albumin_cohort_folder.name
+# small esthetical changes
+table_1_ = mytable.tableone.droplevel(1)
+table_1_.columns.set_levels(
+    [
+        *list(table_1_.columns.levels[1][:2]),
+        "Cristalloids only",
+        "Cristalloids + Albumin",
+    ],
+    level=1,
+    inplace=True,
+)
+mytable.tableone = table_1_
+mytable.to_latex = mytable.tableone.to_latex
+mytable.to_latex(DIR2DOCS_IMG / cohort_name / "table1.tex")
+# %%

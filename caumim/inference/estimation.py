@@ -5,6 +5,8 @@ import numpy as np
 import pandas as pd
 import polars as pl
 from sklearn import clone
+from sklearn.dummy import check_random_state
+from sklearn.utils import _safe_indexing
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.compose import ColumnTransformer
 from sklearn.discriminant_analysis import StandardScaler
@@ -20,9 +22,14 @@ from sklearn.model_selection import (
 from sklearn.pipeline import Pipeline, make_pipeline
 from sklearn.preprocessing import OneHotEncoder
 from sklearn.ensemble._stacking import _BaseStacking
-from caumim.inference.scores import print_metrics_binary, print_metrics_regression
+from caumim.inference.scores import (
+    print_metrics_binary,
+    print_metrics_regression,
+)
 
 from caumim.inference.utils import (
+    cast_to_dataframe,
+    dummy1Fold,
     cross_val_predict_from_fitted,
     dummy1Fold,
     get_treatment_and_covariates,
@@ -31,23 +38,6 @@ from caumim.inference.utils import (
     tau_ipw,
     tau_g_formula,
 )
-
-
-# pipelines
-ESTIMATOR_LR = {
-    "treatment_estimator": LogisticRegression(n_jobs=-1),
-    "treatment_estimator_kwargs": {
-        "treatment_estimator__C": np.logspace(-4, 3, 1),
-    },
-}
-ESTIMATOR_RF = {
-    "treatment_estimator": RandomForestClassifier(),
-    "treatment_estimator_kwargs": {
-        "treatment_estimator__n_estimators": [10, 100, 500],
-        "treatment_estimator__max_depth": [3, 10, 100],
-    },
-}
-
 
 # ### MetaLearners ### #
 SLEARNER_LABEL = "SLearner"
@@ -85,6 +75,7 @@ class AteEstimator(object):
         self,
         outcome_model: BaseEstimator = None,
         propensity_model: BaseEstimator = None,
+        treatment_column: str = "a",
         tau: str = AIPW_LABEL,
         n_splits=5,
         random_state_cv=42,
@@ -114,16 +105,27 @@ class AteEstimator(object):
             logging.info("TAU set to REG, forcing propensity_model to be None")
         self.outcome_model = outcome_model
         self.propensity_model = propensity_model
-        self.meta_learner_type = meta_learner
         self.outcome_models = []
         self.propensity_models = []
         self.random_state_cv = random_state_cv
         self.n_splits = n_splits
         self.clip = clip
-        self.meta_learner = set_meta_learner(
-            self.meta_learner_type, self.outcome_model
-        )
-
+        self.treatment_column = treatment_column
+        if self.tau in [G_FORMULA_LABEL, AIPW_LABEL]:
+            # meta_learner is necessary for G-formula and AIPW only
+            self.meta_learner_type = meta_learner
+            if self.meta_learner_type not in [TLEARNER_LABEL, SLEARNER_LABEL]:
+                raise ValueError(
+                    f"Meta-learner {self.meta_learner_type} not supported"
+                )
+            self.meta_learner = set_meta_learner(
+                self.meta_learner_type,
+                self.outcome_model,
+                treatment_column=self.treatment_column,
+            )
+        else:
+            self.meta_learner = None
+            self.meta_learner_type = None
         # TODO: should have different kfold for propensity and outcome
         if self.n_splits == 1:
             self.kfold = dummy1Fold()
@@ -160,13 +162,18 @@ class AteEstimator(object):
         self.in_sample_ate = None
 
     def fit(self, X, y):
-        a, X_cov = get_treatment_and_covariates(X)
-
+        # force to process pandas DataFrame instead of numpy array
+        X_ = cast_to_dataframe(X, self.treatment_column)
+        a, X_cov = get_treatment_and_covariates(X_, self.treatment_column)
         if self.outcome_model is not None:
-            splitter_y = self.kfold.split(X_cov, a)
-            for train_index, _ in splitter_y:
+            # a is passed for stratified split
+            splitter_ix = self.kfold.split(np.arange(len(X_cov)), a)
+            for train_index, _ in splitter_ix:
                 outcome_estimator_fold = clone(self.meta_learner)
-                outcome_estimator_fold.fit(X[train_index], y[train_index])
+                outcome_estimator_fold.fit(
+                    _safe_indexing(X, train_index, axis=0),
+                    _safe_indexing(y, train_index, axis=0),
+                )
                 self.outcome_models.append(outcome_estimator_fold)
 
         if self.propensity_model is not None:
@@ -174,14 +181,17 @@ class AteEstimator(object):
 
     def _fit_propensity(self, X, a):
         # TODO: add recalibration here with a train/test split
-        splitter_a = self.kfold.split(X, a)
+        splitter_ix = self.kfold.split(np.arange(len(X)), a)
         # a = a.reshape(-1, 1)
-        for train_index, _ in splitter_a:
+        for train_index, _ in splitter_ix:
             if self.propensity_model is not None:
                 propensity_estimator_fold = clone(
                     self.propensity_model, safe=True
                 )
-                propensity_estimator_fold.fit(X[train_index], a[train_index])
+                propensity_estimator_fold.fit(
+                    _safe_indexing(X, train_index, axis=0),
+                    _safe_indexing(a, train_index, axis=0),
+                )
                 self.propensity_models.append(propensity_estimator_fold)
 
     # TODO: scoring is extern to a model in scikitlearn api and there is no reason to act differently for causal inference.
@@ -204,8 +214,9 @@ class AteEstimator(object):
             metrics [Dict]: [description]
         """
         # Forcing one dimension for y and a
-        y = y.ravel()
-        a, X_cov = get_treatment_and_covariates(X)
+        y = np.array(y).ravel()
+        X = cast_to_dataframe(X, self.treatment_column)
+        a, X_cov = get_treatment_and_covariates(X, self.treatment_column)
         # a = a.ravel()
         # checking wich nuisance models are used
         n_outcome_models = len(self.outcome_models)
@@ -215,18 +226,19 @@ class AteEstimator(object):
         if not leftout:
             chunks_indices = [
                 np.arange(len(X))[test_ix]
-                for _, test_ix in self.kfold.split(X_cov, a)
+                for _, test_ix in self.kfold.split(np.arange(len(X)), a)
             ]
             chunks_X_cov = [
-                X_cov[test_ix] for _, test_ix in self.kfold.split(X_cov, a)
+                _safe_indexing(X_cov, test_ix, axis=0)
+                for _, test_ix in self.kfold.split(np.arange(len(X)), a)
             ]
             chunks_y = [
                 np.array(y)[test_ix]
-                for _, test_ix in self.kfold.split(X_cov, a)
+                for _, test_ix in self.kfold.split(np.arange(len(X)), a)
             ]
             chunks_a = [
                 np.array(a)[test_ix]
-                for _, test_ix in self.kfold.split(X_cov, a)
+                for _, test_ix in self.kfold.split(np.arange(len(X)), a)
             ]
             # if no folds is provided, this is test data, we average over the cv models
         else:
@@ -240,27 +252,25 @@ class AteEstimator(object):
         for i in range(n_models):
             # reshaped_a = np.expand_dims(, axis=1)
             if n_outcome_models > 0:
+                zeros_a = pd.DataFrame(
+                    np.zeros_like(chunks_a[i]), columns=[self.treatment_column]
+                )
+                ones_a = pd.DataFrame(
+                    np.ones_like(chunks_a[i]), columns=[self.treatment_column]
+                )
                 if self.outcome_model._estimator_type == "classifier":
                     chunk_y_hat_0 = self.outcome_models[i].predict_proba(
-                        np.column_stack(
-                            [np.zeros_like(chunks_a[i]), chunks_X_cov[i]]
-                        )
+                        pd.DataFrame([zeros_a, chunks_X_cov[i]])
                     )[:, 1]
                     chunk_y_hat_1 = self.outcome_models[i].predict_proba(
-                        np.column_stack(
-                            [np.ones_like(chunks_a[i]), chunks_X_cov[i]]
-                        )
+                        pd.DataFrame([ones_a, chunks_X_cov[i]])
                     )[:, 1]
                 else:
                     chunk_y_hat_0 = self.outcome_models[i].predict(
-                        np.column_stack(
-                            [np.zeros_like(chunks_a[i]), chunks_X_cov[i]]
-                        )
+                        pd.DataFrame([zeros_a, chunks_X_cov[i]])
                     )
                     chunk_y_hat_1 = self.outcome_models[i].predict(
-                        np.column_stack(
-                            [np.ones_like(chunks_a[i]), chunks_X_cov[i]]
-                        )
+                        pd.DataFrame([ones_a, chunks_X_cov[i]])
                     )
                 mu_1.append(chunk_y_hat_1)
                 mu_0.append(chunk_y_hat_0)
@@ -403,7 +413,48 @@ class AteEstimator(object):
         self.in_sample_ate = estimate["hat_ate"]
         return predictions, estimate, metrics
 
+    def get_confidence_intervals(
+        self, X, y, n_reps: int = 5
+    ) -> Tuple[float, float, float]:
+        """
+        Confidence intervals for the ATE using classical bootstrap.
+        TODO: Do I have to refit the models ? I think so, but it's not clear to me, since
+        dowhy is not doing this.
 
+        Args:
+            X (_type_): _description_ y (_type_): _description_ n_reps (int,
+            optional): _description_. Defaults to 5.
+        Returns:
+            Tuple[float, float, float]: Lower bound, mean effect and upper
+            bounds of the confidence interval at 95%.
+        """
+        self.bs_estimates = []
+        self.bs_prediction = []
+        self.bs_metrics = []
+        for i in range(n_reps):
+            rg = check_random_state(self.random_state_cv + i)
+            index_bs = rg.choice(np.arange(len(X)), size=len(X), replace=True)
+            X_bs = _safe_indexing(X, index_bs, axis=0).reset_index(drop=True)
+            y_bs = _safe_indexing(y, index_bs, axis=0).reset_index(drop=True)
+            # TODO: list index out of range, since we are fitting two time the
+            # models
+            predictions, estimate, metrics = self.fit_predict_estimate(
+                X_bs, y_bs
+            )
+
+            self.bs_estimates.append(estimate)
+            self.bs_prediction.append(predictions)
+            self.bs_metrics.append(metrics)
+
+        mean_effect = np.mean([e["hat_ate"] for e in self.bs_estimates])
+        std_effect = np.std([e["hat_ate"] for e in self.bs_estimates])
+        self.lb = mean_effect - 1.96 * std_effect
+        self.mean_effect = mean_effect
+        self.ub = mean_effect + 1.96 * std_effect
+        return self.lb, self.mean_effect, self.ub
+
+
+# TODO: adapt to Pandas Frame
 class CateEstimator(object):
     """Estimator class for CATE model. Supports SLearner, TLearner and RLearner.
     Args:
@@ -656,11 +707,12 @@ def set_meta_learner(
     meta_learner_name: str,
     final_estimator: BaseEstimator,
     featurizer: TransformerMixin = None,
+    treatment_column: str = "a",
 ):
     if meta_learner_name == TLEARNER_LABEL:
-        meta_learner = TLearner(final_estimator, featurizer)
+        meta_learner = TLearner(final_estimator, featurizer, treatment_column)
     elif meta_learner_name == SLEARNER_LABEL:
-        meta_learner = SLearner(final_estimator, featurizer)
+        meta_learner = SLearner(final_estimator, featurizer, treatment_column)
     elif meta_learner_name == RLEARNER_LABEL:
         meta_learner = make_pipeline(featurizer, final_estimator)
     else:
@@ -686,15 +738,17 @@ class SLearner(MetaLearner, BaseEstimator):
         self,
         final_estimator: BaseEstimator,
         featurizer: TransformerMixin = None,
+        treatment_column: str = "a",
     ) -> None:
         self.final_estimator = final_estimator
+        self.treatment_column = treatment_column
         if featurizer is None:
             self.featurizer = IdentityTransformer()
         else:
             self.featurizer = featurizer
 
     def fit(self, X, y):
-        a, X_cov = get_treatment_and_covariates(X)
+        a, X_cov = get_treatment_and_covariates(X, self.treatment_column)
         self.featurizer_ = clone(self.featurizer)
         self.final_estimator_ = clone(self.final_estimator)
         X_transformed = self.featurizer_.fit_transform(X_cov)
@@ -702,14 +756,14 @@ class SLearner(MetaLearner, BaseEstimator):
         return self
 
     def predict(self, X):
-        a, X_cov = get_treatment_and_covariates(X)
+        a, X_cov = get_treatment_and_covariates(X, self.treatment_column)
         X_transformed = self.featurizer_.transform(X_cov)
         return self.final_estimator_.predict(
             np.column_stack((a, X_transformed))
         )
 
     def predict_proba(self, X):
-        a, X_cov = get_treatment_and_covariates(X)
+        a, X_cov = get_treatment_and_covariates(X, self.treatment_column)
         X_transformed = self.featurizer_.transform(X_cov)
         return self.final_estimator_.predict_proba(
             np.column_stack((a, X_transformed))
@@ -734,15 +788,17 @@ class TLearner(MetaLearner, BaseEstimator):
         self,
         final_estimator: BaseEstimator,
         featurizer: TransformerMixin = None,
+        treatment_column: str = "a",
     ) -> None:
         self.final_estimator = final_estimator
+        self.treatment_column = treatment_column
         if featurizer is None:
             self.featurizer = IdentityTransform()
         else:
             self.featurizer = featurizer
 
     def fit(self, X, y):
-        a, X_cov = get_treatment_and_covariates(X)
+        a, X_cov = get_treatment_and_covariates(X, self.treatment_column)
 
         self.featurizer_control_ = clone(self.featurizer)
         self.final_estimator_control_ = clone(self.final_estimator)
@@ -772,7 +828,7 @@ class TLearner(MetaLearner, BaseEstimator):
         return self
 
     def predict(self, X):
-        a, X_cov = get_treatment_and_covariates(X)
+        a, X_cov = get_treatment_and_covariates(X, self.treatment_column)
 
         mask_control = a == 0
         mask_treated = a == 1
@@ -795,7 +851,7 @@ class TLearner(MetaLearner, BaseEstimator):
         return y
 
     def predict_proba(self, X):
-        a, X_cov = get_treatment_and_covariates(X)
+        a, X_cov = get_treatment_and_covariates(X, self.treatment_column)
 
         mask_control = a == 0
         mask_treated = a == 1
@@ -828,17 +884,19 @@ class RLearner(MetaLearner, BaseEstimator):
         y_estimator: BaseEstimator,
         a_estimator: BaseEstimator,
         featurizer: TransformerMixin = None,
+        treatment_column: str = "a",
     ) -> None:
         if featurizer is None:
             self.featurizer = IdentityTransformer()
         else:
             self.featurizer = featurizer
+        self.treatment_column = treatment_column
         self.final_estimator = make_pipeline(self.featurizer, final_estimator)
         self.y_estimator = make_pipeline(self.featurizer, y_estimator)
         self.a_estimator = make_pipeline(self.featurizer, a_estimator)
 
     def fit(self, X, y):
-        a, X_cov = get_treatment_and_covariates(X)
+        a, X_cov = get_treatment_and_covariates(X, self.treatment_column)
         splitter_a = self.cv.split(X_cov, a)
         self.a_estimator_cv_ = cross_validate(
             clone(self.y_estimator),
@@ -880,5 +938,5 @@ class RLearner(MetaLearner, BaseEstimator):
         )
 
     def predict(self, X):
-        _, X_cov = get_treatment_and_covariates(X)
+        _, X_cov = get_treatment_and_covariates(X, self.treatment_column)
         return self.final_estimator.predict(X_cov)

@@ -1,5 +1,46 @@
 import numpy as np
+import pandas as pd
 from sklearn.calibration import column_or_1d
+from typing import Dict, Iterable, List
+from sklearn.base import BaseEstimator
+from sklearn.compose import ColumnTransformer
+from sklearn.model_selection import RandomizedSearchCV
+from sklearn.pipeline import Pipeline
+from sklearn.base import is_classifier
+
+
+def make_random_search_pipeline(
+    estimator: BaseEstimator,
+    param_distributions: Dict,
+    column_transformer: ColumnTransformer,
+    # estimation_methods: str ,
+    n_iter: int = 10,
+    random_state: int = 42,
+):
+    # if estimation_methods == "econml":
+    #     pipeline_steps = [
+    #         ("estimator", estimator),
+    #     ]
+    # else:
+    pipeline_steps = [
+        ("preprocessor", column_transformer),
+        ("estimator", estimator),
+    ]
+    # better to optimize for brier score if this is aclass
+    if is_classifier(estimator):
+        scoring_ = "neg_brier_score"
+    else:
+        scoring_ = None
+    pipeline = RandomizedSearchCV(
+        Pipeline(pipeline_steps),
+        param_distributions=param_distributions,
+        random_state=random_state,
+        n_iter=n_iter,
+        n_jobs=-1,
+        scoring=scoring_,
+    )
+
+    return pipeline
 
 
 class dummy1Fold:
@@ -47,7 +88,7 @@ def cross_val_predict_from_fitted(
     return hat_Y
 
 
-def get_treatment_and_covariates(X):
+def get_treatment_and_covariates(X, treament_col=None):
     """Split treatment and covariates from full covariate matrix $X=[a, X_cov]$.
 
     Require that the first column of $X$ is the treatment indicator.
@@ -61,14 +102,42 @@ def get_treatment_and_covariates(X):
     Returns:
         _type_: _description_
     """
-    a = X[:, 0]
-    X_cov = X[:, 1:]
-    a = column_or_1d(a, warn=True)
+
+    if isinstance(X, pd.DataFrame):
+        if treament_col is not None:
+            a = X[treament_col]
+            X_cov = X[[c for c in X.columns if c != treament_col]]
+        else:
+            raise ValueError(
+                "If X is a pandas DataFrame, treatment_col should be specified."
+            )
+    elif isinstance(X, np.ndarray):
+        a = X[:, 0]
+        X_cov = X[:, 1:]
+        a = column_or_1d(a, warn=True)
+    else:
+        raise ValueError(
+            "X should be either a pandas DataFrame or a numpy array."
+        )
     if not np.array_equal(a, a.astype(bool)):
         raise ValueError(
             "First column of covariates should contains the treatment indicator as binary values."
         )
     return a, X_cov
+
+
+def cast_to_dataframe(X, treatment_column: str) -> pd.DataFrame:
+    if isinstance(X, np.ndarray):
+        X_ = pd.DataFrame(
+            X,
+            columns=[
+                treatment_column,
+                *[f"X_{i}" for i in range(X.shape[1] - 1)],
+            ],
+        )
+    else:
+        X_ = X.copy()
+    return X_
 
 
 # ### Causal Estimators for ATE ### #
@@ -139,3 +208,29 @@ def tau_aipw(y, mu_1, mu_0, a, a_hat_proba):
         "lower_ci": None,
         "upper_ci": None,
     }
+
+
+def safe_hstack(it: List):
+    """Safe hstack for numpy and pandas"""
+    first_elem = it[0]
+    if isinstance(first_elem, pd.DataFrame):
+        return pd.concat(it, axis=1)
+    elif isinstance(first_elem, np.ndarray):
+        return np.hstack(it)
+    else:
+        raise ValueError(
+            "X should be either a pandas DataFrame or a numpy array."
+        )
+
+
+def safe_vstack(it: List):
+    """Safe vstack for numpy and pandas"""
+    first_elem = it[0]
+    if isinstance(first_elem, pd.DataFrame):
+        return pd.concat(it, axis=0)
+    elif isinstance(first_elem, np.ndarray):
+        return np.vstack(it)
+    else:
+        raise ValueError(
+            "X should be either a pandas DataFrame or a numpy array."
+        )

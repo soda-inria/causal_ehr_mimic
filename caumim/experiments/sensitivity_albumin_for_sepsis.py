@@ -1,14 +1,22 @@
 from copy import deepcopy
+from datetime import datetime
 from loguru import logger
 import polars as pl
 import pandas as pd
 import numpy as np
+from sklearn import clone
 from sklearn.model_selection import ParameterGrid, RandomizedSearchCV
 from sklearn.utils import Bunch
 from caumim.constants import *
 from caumim.framing.albumin_for_sepsis import COHORT_CONFIG_ALBUMIN_FOR_SEPSIS
 from caumim.framing.utils import create_cohort_folder
-from caumim.inference.estimation import ESTIMATOR_LR, make_column_tranformer
+from caumim.experiments.configurations import ESTIMATOR_RIDGE, ESTIMATOR_RF
+from caumim.experiments.utils import (
+    InferenceWrapper,
+    fit_randomized_search,
+    make_column_transformer,
+)
+from caumim.inference.utils import make_random_search_pipeline
 
 from caumim.variables.selection import get_albumin_events_zhou_baseline
 from caumim.variables.utils import (
@@ -18,11 +26,7 @@ from caumim.variables.utils import (
 from caumim.experiments.utils import log_estimate
 
 from dowhy import CausalModel
-from sklearn.compose import ColumnTransformer
-from sklearn.preprocessing import OneHotEncoder, StandardScaler
-from sklearn.impute import SimpleImputer
 from sklearn.pipeline import Pipeline, make_pipeline
-from sklearn.linear_model import LogisticRegression
 from zepid import RiskDifference
 
 
@@ -30,27 +34,45 @@ config = Bunch(
     **{
         "outcome_name": COLNAME_MORTALITY_28D,
         "experience_grid_dict": {
-            "event_aggregations": [
-                # [pl.min(), pl.max()],
-                # [pl.first()],
-                # pl.element().first(),
+            "event_aggregation": [
+                # [pl.min(), pl.max()], # TODO: test other forms of feature
+                # aggregations.
+                pl.element().first(),  # ], pl.element().first(),
                 pl.element().last(),
-                pl.element().median(),
+                # pl.element().median(),
             ],
-            "estimation_methods": ["backdoor.propensity_score_matching"],
-            "estimators": [
-                ESTIMATOR_LR,
+            "estimation_method": [
+                "backdoor.propensity_score_weighting",
+                "LinearDML",
+                "TLearner",
+                "LinearDRLearner",
+                # "CausalForest",
+            ],
+            "estimator": [
+                # ESTIMATOR_RIDGE,
+                ESTIMATOR_RF
             ],
         },
+        "fraction": 1,
+        "random_state": 0,
     }
 )
 
 
 def run_experiment(config):
-    # 1 - Framing
     cohort_folder = create_cohort_folder(COHORT_CONFIG_ALBUMIN_FOR_SEPSIS)
+    log_folder = (
+        DIR2EXPERIENCES
+        / cohort_folder.name
+        / ("estimates" + f"_{config.expe_name}")
+    )
+    # 1 - Framing
     target_trial_population = pl.read_parquet(
         cohort_folder / FILENAME_TARGET_POPULATION
+    )
+    # FOR TESTING: subsample the data
+    target_trial_population = target_trial_population.sample(
+        fraction=config["fraction"], shuffle=True, seed=config.random_state
     )
     # 2 - Variable selection
     # Static features
@@ -85,9 +107,9 @@ def run_experiment(config):
         target_trial_population
     )
     experience_grid_dict = {
-        "event_aggregations": config.experience_grid_dict["event_aggregations"],
-        "estimation_methods": config.experience_grid_dict["estimation_methods"],
-        "estimators": config.experience_grid_dict["estimators"],
+        "event_aggregation": config.experience_grid_dict["event_aggregation"],
+        "estimation_method": config.experience_grid_dict["estimation_method"],
+        "estimator": config.experience_grid_dict["estimator"],
     }
     runs_to_be_launch = list(ParameterGrid(experience_grid_dict))
 
@@ -102,32 +124,33 @@ def run_experiment(config):
         RESULT_ATE: dm.results.RiskDifference[1],
         RESULT_ATE_LB: dm.results.RiskDifference[1],
         RESULT_ATE_UB: dm.results.RiskDifference[1],
-        "event_aggregations": str(None),
-        "estimation_methods": "Difference in mean",
+        "event_aggregation": str(None),
+        "estimation_method": "Difference in mean",
         "treatment_model": str(None),
         "outcome_model": str(None),
     }
-    log_estimate(estimate_difference_in_mean, cohort_folder / "estimates")
+    log_estimate(estimate_difference_in_mean, cohort_folder / log_folder)
 
     logger.info(
         f"{len(runs_to_be_launch)} configs to run :\n {runs_to_be_launch}\n------"
     )
+
     for run_config in runs_to_be_launch:
         logger.info(f"Running {run_config}")
         # Variable aggregation
         # TODO: should rewrite make_count with polars.
-        patient_features_last = event_features.sort(
+        patient_features_aggregated = event_features.sort(
             [COLNAME_PATIENT_ID, COLNAME_START]
         ).pivot(
             index=STAY_KEYS,
             columns=COLNAME_CODE,
             values="value",
-            aggregate_function=run_config["event_aggregations"],
+            aggregate_function=run_config["event_aggregation"],
         )
         event_features_names = list(
-            set(patient_features_last.columns).difference(set(STAY_KEYS))
+            set(patient_features_aggregated.columns).difference(set(STAY_KEYS))
         )
-        X = patient_features_last.join(
+        X = patient_features_aggregated.join(
             target_trial_population,
             on=STAY_KEYS,
             how="inner",
@@ -145,72 +168,65 @@ def run_experiment(config):
         ].fillna(value=0)
 
         # 3 - Identification and estimation
-        column_transformer = make_column_tranformer(
+        column_transformer = make_column_transformer(
             numerical_features=feature_types.numerical_features,
             categorical_features=feature_types.categorical_features,
         )
-        treatment_estimator = run_config["estimators"].get(
-            "treatment_estimator", None
+        # Both treatment and outcome models are the same models for now.
+        estimator_config = run_config["estimator"]
+        estimator_name = estimator_config["name"]
+        treatment_pipeline = make_random_search_pipeline(
+            estimator=clone(estimator_config["treatment_estimator"]),
+            column_transformer=column_transformer,
+            param_distributions=estimator_config[
+                "treatment_param_distributions"
+            ],
         )
-        treatment_hp_kwargs = run_config["estimators"].get(
-            "treatment_estimator_kwargs", {}
+        outcome_pipeline = make_random_search_pipeline(
+            estimator=clone(estimator_config["outcome_estimator"]),
+            column_transformer=column_transformer,
+            param_distributions=estimator_config["outcome_param_distributions"],
         )
-        if treatment_estimator is not None:
-            treatment_pipeline = RandomizedSearchCV(
-                Pipeline(
-                    [
-                        ("preprocessor", column_transformer),
-                        ("treatment_estimator", treatment_estimator),
-                    ]
-                ),
-                param_distributions=treatment_hp_kwargs,
-                n_iter=10,
-                n_jobs=-1,
-            )
-        # TODO: allow outcome models
-        outcome_estimator = run_config["estimators"].get(
-            "outcome_estimator", None
+
+        # First, find appropriate hyperparameters for the pipelines:
+        logger.info("Fitting randomsearch for hyperparameter optimization")
+        a = X[COLNAME_INTERVENTION_STATUS]
+        y = X[outcome_name]
+        treatment_best_pipeline, outcome_best_pipeline = fit_randomized_search(
+            X=X.drop(columns=[COLNAME_INTERVENTION_STATUS, outcome_name]),
+            a=a,
+            y=y,
+            treatment_pipeline=treatment_pipeline,
+            outcome_pipeline=outcome_pipeline,
         )
-        if outcome_estimator is not None:
-            outcome_pipeline = make_pipeline(
-                *[column_transformer, outcome_estimator]
-            )
-        else:
-            outcome_pipeline = None
+        # Then apply transformer since econml does not support nan input:
+        X_transformed = column_transformer.fit_transform(
+            X.drop([COLNAME_INTERVENTION_STATUS, outcome_name], axis=1)
+        )
+        X_transformed = pd.DataFrame(
+            X_transformed, columns=column_transformer.get_feature_names_out()
+        )
+        X_a = pd.concat([X_transformed, a], axis=1)
         # 4 - Estimation
-        ## TODO: dowhy machinery, not very useful for ATE IMHO, favor causalml api
-        model = CausalModel(
-            data=X,
-            treatment=COLNAME_INTERVENTION_STATUS,
-            outcome=outcome_name,
-            common_causes=[*event_features_names, *static_features],
+        inference_wrapper = InferenceWrapper(
+            treatment_pipeline=treatment_best_pipeline,
+            outcome_pipeline=outcome_best_pipeline,
+            estimation_method=run_config["estimation_method"],
+            outcome_name=outcome_name,
+            treatment_name=COLNAME_INTERVENTION_STATUS,
         )
-        identified_estimand = model.identify_effect(
-            optimize_backdoor=True, proceed_when_unidentifiable=True
-        )
-        estimate = model.estimate_effect(
-            identified_estimand,
-            method_name=run_config["estimation_methods"],
-            method_params={
-                "propensity_score_model": treatment_pipeline,
-                "min_ps_score": 0.05,
-                "max_ps_score": 0.95,
-                "outcome_pipeline": outcome_pipeline,
-            },
-            confidence_intervals=True,
-        )
-        lower_bound, upper_bound = estimate.get_confidence_intervals()
-        # logging
-        run_logs = {}
-        run_logs[RESULT_ATE] = estimate.value
-        run_logs[RESULT_ATE_LB] = lower_bound
-        run_logs[RESULT_ATE_UB] = upper_bound
-        run_logs["event_aggregations"] = str(run_config["event_aggregations"])
-        run_logs["estimation_methods"] = run_config["estimation_methods"]
-        run_logs["treatment_model"] = str(treatment_estimator)
-        run_logs["outcome_model"] = str(outcome_estimator)
-        log_estimate(run_logs, cohort_folder / "estimates")
+        inference_wrapper.fit(X_a, y)
+        results = inference_wrapper.predict(X=X_a)
+
+        results["event_aggregation"] = str(run_config["event_aggregation"])
+        results["estimation_method"] = run_config["estimation_method"]
+        results["treatment_model"] = estimator_name
+        results["outcome_model"] = estimator_name
+        log_estimate(results, log_folder)
 
 
 if __name__ == "__main__":
+    if "expe_name" not in config.keys():
+        expe_name = datetime.now().strftime("%Y%m%d%H%M%S")
+        config["expe_name"] = expe_name
     run_experiment(config)

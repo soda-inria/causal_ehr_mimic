@@ -1,3 +1,4 @@
+# %%
 import numpy as np
 import pandas as pd
 
@@ -8,33 +9,55 @@ from caumim.constants import *
 from caumim.framing.albumin_for_sepsis import COHORT_CONFIG_ALBUMIN_FOR_SEPSIS
 from caumim.framing.utils import create_cohort_folder
 
+IDENTIFICATION2LABELS = {
+    "Difference in mean": "Difference in mean",
+    "backdoor.propensity_score_weighting": "Inverse Propensity Weighting",
+    "TLearner": "Outcome model (TLearner)",
+    "LinearDML": "Double Machine Learning",
+    "LinearDRLearner": "Doubly Robust (AIPW)",
+}
+OUTCOME2LABELS = {
+    COLNAME_MORTALITY_28D: "28-day mortality",
+    COLNAME_MORTALITY_90D: "90-day mortality",
+}
 # %%
 cohort_dir = create_cohort_folder(COHORT_CONFIG_ALBUMIN_FOR_SEPSIS)
-# %%
-results = pd.read_parquet(cohort_dir / "estimates")
+cohort_name = cohort_dir.name
+expe_name = "estimates_20230505__est_lr_rf__agg_first_last"  #
+# expe_name = "estimates_20230505221737__est_rf__agg_first_last"  #
+### For IP matching, interesting results with RF which seems to overfit the data and results are dependents on the aggregation strategy.
+results = pd.read_parquet(DIR2EXPERIENCES / cohort_name / expe_name)
+outcome_name = COLNAME_MORTALITY_28D
+
 results["label"] = (
-    results["event_aggregations"].map(
+    "Agg="
+    + results["event_aggregation"].map(
         lambda x: x.split(".")[-1].replace("()", "")
     )
-    + ""
-    + results["estimation_methods"]
-    + "\n"
+    # + "\nidentification:"
+    # + results["estimation_method"].map(
+    #     lambda x: IDENTIFICATION2LABEL[x]
+    #     if x in IDENTIFICATION2LABEL.keys()
+    #     else x
+    # )
+    + ", Est="
     + results["treatment_model"]
 )
-# %%
-# zepid: bof bof...
-from zepid.graphics.graphics import EffectMeasurePlot, zipper_plot
-
-f_plot = EffectMeasurePlot(
-    label=results["label"],
-    effect_measure=results[RESULT_ATE],
-    lcl=results[RESULT_ATE_LB],
-    ucl=results[RESULT_ATE_UB],
+results.loc[results["estimation_method"] == "Difference in mean", "label"] = ""
+results["estimation_method"] = results["estimation_method"].map(
+    lambda x: IDENTIFICATION2LABELS[x]
+    if x in IDENTIFICATION2LABELS.keys()
+    else x
 )
-f_plot.plot(figsize=(6.5, 3), t_adjuster=0.1, min_value=-0.15, max_value=0.15)
-# plt.tight_layout()
-plt.show()
-# plt.savefig(DIR2DOCS_IMG / "albumin_for_sepsis_forest_plot.pdf")
+results["sortby"] = (
+    results["treatment_model"] + "_" + results["event_aggregation"]
+)
+print(
+    results.groupby(["estimation_method", "treatment_model"])[
+        "event_aggregation"
+    ].count()
+)
+
 # %%
 import forestplot as fp
 
@@ -45,5 +68,15 @@ fp.forestplot(
     hl=RESULT_ATE_UB,  # columns containing conf. int. lower and higher limits
     varlabel="label",  # column containing variable label
     ylabel="Confidence interval",  # y-label title
-    xlabel="ATE",  # x-label title
+    xlabel=f"ATE on {OUTCOME2LABELS[outcome_name]}",  # x-label title
+    # annote=["treatment_model", "event_aggregation"],  # columns to annotate
+    groupvar="estimation_method",  # group variable
+    group_order=list(IDENTIFICATION2LABELS.values()),
+    figsize=(5, 12),
+    color_alt_rows=True,
+    sortby="sortby",
 )
+path2img = DIR2DOCS_IMG / cohort_name
+path2img.mkdir(exist_ok=True, parents=True)
+plt.savefig(path2img / f"{expe_name}.pdf", bbox_inches="tight")
+# %%
