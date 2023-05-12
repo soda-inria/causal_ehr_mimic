@@ -84,7 +84,21 @@ RESULT_ATE = "ATE"
 RESULT_ATE_LB = "ATE lower bound"
 RESULT_ATE_UB = "ATE upper bound"
 
-# legacy: keep?
+# report constants
+
+IDENTIFICATION2LABELS = {
+    "Difference in mean": "Unajusted risk difference",
+    "backdoor.propensity_score_weighting": "Inverse Propensity Weighting",
+    "TLearner": "Outcome model (TLearner)",
+    "LinearDML": "Double Machine Learning",
+    "LinearDRLearner": "Doubly Robust (AIPW)",
+}
+OUTCOME2LABELS = {
+    COLNAME_MORTALITY_28D: "28-day mortality",
+    COLNAME_MORTALITY_90D: "90-day mortality",
+}
+
+# TODO: legacy: remove
 # Expert features
 STATIC_FEATURES_BASICS = ["age", "gender", "insurance"]
 # Variables grouping derived from [Wang et al., 2020]() :

@@ -51,10 +51,14 @@ def fit_randomized_search(
 def make_column_transformer(
     numerical_features: list, categorical_features: list
 ) -> Pipeline:
+    """
+    Create a simple feature preprocessing pipeline.
+    """
     categorical_preprocessor = OneHotEncoder(handle_unknown="ignore")
     numerical_preprocessor = make_pipeline(
         *[
             StandardScaler(),
+            # TODO: what is the effect of adding the mask on the results ?
             SimpleImputer(strategy="median"),
         ]
     )

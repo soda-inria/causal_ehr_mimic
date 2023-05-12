@@ -3,5 +3,5 @@
 
 # ... except for this one.
 !.gitignore
-!experiments
-!experiments/**
+!experiences
+!experiences/**

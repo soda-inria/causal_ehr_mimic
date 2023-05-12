@@ -30,8 +30,10 @@ from sklearn.pipeline import Pipeline, make_pipeline
 from zepid import RiskDifference
 
 
-config = Bunch(
+sensitivity_config = Bunch(
     **{
+        "expe_name": None,
+        "cohort_folder": DIR2COHORT / "albumin_for_sepsis",
         "outcome_name": COLNAME_MORTALITY_28D,
         "experience_grid_dict": {
             "event_aggregation": [
@@ -59,13 +61,17 @@ config = Bunch(
 )
 
 
-def run_experiment(config):
-    cohort_folder = create_cohort_folder(COHORT_CONFIG_ALBUMIN_FOR_SEPSIS)
-    log_folder = (
-        DIR2EXPERIENCES
-        / cohort_folder.name
-        / ("estimates" + f"_{config.expe_name}")
-    )
+def run_sensitivity_experiment(config):
+    cohort_folder = config.cohort_folder
+    if "expe_name" not in config.keys():
+        expe_name = datetime.now().strftime("%Y%m%d%H%M%S")
+        log_folder = (
+            DIR2EXPERIENCES
+            / cohort_folder.name
+            / ("estimates" + f"_{expe_name}")
+        )
+    else:
+        log_folder = DIR2EXPERIENCES / config.expe_name
     # 1 - Framing
     target_trial_population = pl.read_parquet(
         cohort_folder / FILENAME_TARGET_POPULATION
@@ -102,7 +108,8 @@ def run_experiment(config):
     ]
     outcome_name = config.outcome_name
 
-    # event features
+    # event features TODO: this is the only code specific to the albumin study.
+    # I could make it more generalizable by asking for a event_features function.
     event_features, feature_types = get_albumin_events_zhou_baseline(
         target_trial_population
     )
@@ -114,6 +121,7 @@ def run_experiment(config):
     runs_to_be_launch = list(ParameterGrid(experience_grid_dict))
 
     # Naive DM estimate (zepid)):
+    t0 = datetime.now()
     dm = RiskDifference()
     dm.fit(
         target_trial_population.to_pandas(),
@@ -128,6 +136,9 @@ def run_experiment(config):
         "estimation_method": "Difference in mean",
         "treatment_model": str(None),
         "outcome_model": str(None),
+        "compute_time": (datetime.now() - t0).total_seconds(),
+        "cohort_name": cohort_folder.name,
+        "outcome_name": outcome_name,
     }
     log_estimate(estimate_difference_in_mean, cohort_folder / log_folder)
 
@@ -136,6 +147,7 @@ def run_experiment(config):
     )
 
     for run_config in runs_to_be_launch:
+        t0 = datetime.now()
         logger.info(f"Running {run_config}")
         # Variable aggregation
         # TODO: should rewrite make_count with polars.
@@ -222,11 +234,11 @@ def run_experiment(config):
         results["estimation_method"] = run_config["estimation_method"]
         results["treatment_model"] = estimator_name
         results["outcome_model"] = estimator_name
+        results["compute_time"] = (datetime.now() - t0).total_seconds()
+        results["cohort_name"] = cohort_folder.name
+        results["outcome_name"] = outcome_name
         log_estimate(results, log_folder)
 
 
 if __name__ == "__main__":
-    if "expe_name" not in config.keys():
-        expe_name = datetime.now().strftime("%Y%m%d%H%M%S")
-        config["expe_name"] = expe_name
-    run_experiment(config)
+    run_sensitivity_experiment(sensitivity_config)

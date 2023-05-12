@@ -21,11 +21,14 @@ from caumim.framing.utils import (
 )
 from caumim.utils import to_lazyframe
 
+
+observation_window_in_day = 3
 COHORT_CONFIG_ALBUMIN_FOR_SEPSIS = Bunch(
     **{
         "min_age": 18,
-        "min_icu_survival_unit_day": 1,
-        "min_los_icu_unit_day": 1,
+        "min_icu_survival_unit_day": observation_window_in_day,  # the patient should survive at least one day.
+        "min_los_icu_unit_day": observation_window_in_day,  # the patient should stay in ICU at least one day.
+        "treatment_observation_window_unit_day": observation_window_in_day,  # the treatment should happen during the first day.
         "cohort_name": "albumin_for_sepsis",
         "save_cohort": True,
     }
@@ -33,6 +36,13 @@ COHORT_CONFIG_ALBUMIN_FOR_SEPSIS = Bunch(
 
 
 def get_population(cohort_config):
+    # Adapt cohort_name depending on the treatment observation_window
+    cohort_config.cohort_name = (
+        cohort_config.cohort_name
+        + f"__obs_{cohort_config.treatment_observation_window_unit_day}d".replace(
+            ".", "f"
+        )
+    )
     cohort_folder = create_cohort_folder(cohort_config)
     # 1 - Define the inclusion events, ie. the event that defines when a patient
     # enter the cohort.
@@ -67,9 +77,20 @@ def get_population(cohort_config):
         first_crystalloids[COLNAME_INCLUSION_START]
         - first_crystalloids["intime"]
     )
-    # Consider only first day crystalloids
+    # Consider only crystalloids before max_los_before_treatment
     inclusion_event = first_crystalloids.loc[
-        first_crystalloids["delta_crystalloids_icu_intime"].dt.days == 0
+        (
+            first_crystalloids[
+                "delta_crystalloids_icu_intime"
+            ].dt.total_seconds()
+            <= (cohort_config.treatment_observation_window_unit_day * 24 * 3600)
+        )
+        & (
+            first_crystalloids[
+                "delta_crystalloids_icu_intime"
+            ].dt.total_seconds()
+            >= 0
+        )
     ]
     # 2 - Then define different inclusion criteria, applied at the statistical unit
     # level: here it is the **stay level**.
@@ -129,14 +150,25 @@ def get_population(cohort_config):
         first_albumin[COLNAME_INTERVENTION_START] - first_albumin["icu_intime"]
     )
     first_albumin_in24h = first_albumin.loc[
-        first_albumin["delta_albumin_icu_intime"].dt.days == 0
+        (
+            (
+                first_albumin["delta_albumin_icu_intime"].dt.total_seconds()
+                <= (
+                    cohort_config.treatment_observation_window_unit_day
+                    * 24
+                    * 3600
+                )
+            )
+            & (
+                first_albumin["delta_albumin_icu_intime"].dt.total_seconds()
+                >= 0
+            )
+        )
     ]
     first_albumin_in24h = first_albumin_in24h.loc[
         first_albumin_in24h[COLNAME_INTERVENTION_START]
         > first_albumin_in24h[COLNAME_INCLUSION_START]
     ]
-    first_albumin_in24h
-    # %%
     # 4- Define treatment and control population:
     target_trial_population = target_population.merge(
         first_albumin_in24h[
@@ -182,6 +214,9 @@ def get_population(cohort_config):
     if cohort_config.save_cohort:
         target_trial_population.to_parquet(
             cohort_folder / (FILENAME_TARGET_POPULATION)
+        )
+        logger.info(
+            f"Saved cohort at {cohort_folder / (FILENAME_TARGET_POPULATION)}"
         )
     return target_population
 
