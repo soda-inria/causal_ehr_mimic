@@ -12,14 +12,9 @@ from caumim.framing.utils import create_cohort_folder
 # %%
 cohort_dir = create_cohort_folder(COHORT_CONFIG_ALBUMIN_FOR_SEPSIS)
 cohort_name = cohort_dir.name
-expe_name = "estimates_20230517000236_est_lr_rf__agg_first_last"  #
-# expe_name = "estimates_20230516203739"
+expe_name = "sensitivity_feature_aggregation_albumin_for_sepsis_rep"  #
 ### For IP matching, interesting results with RF which seems to overfit the data and results are dependents on the aggregation strategy.
 results = pd.read_parquet(DIR2EXPERIENCES / cohort_name / expe_name)
-mask_matching = (
-    results["estimation_method"] == "backdoor.propensity_score_matching"
-)
-# results = results.loc[~mask_matching]
 outcome_name = COLNAME_MORTALITY_28D
 
 results["label"] = (
@@ -65,9 +60,9 @@ fp.forestplot(
     # annote=["treatment_model", "event_aggregation"],  # columns to annotate
     groupvar="estimation_method",  # group variable
     group_order=[
-        ident_
-        for ident_ in list(IDENTIFICATION2LABELS.values())
-        if ident_ in results["estimation_method"].unique()
+        id_label
+        for id_label in list(IDENTIFICATION2LABELS.values())
+        if id_label in results["estimation_method"].unique()
     ],
     figsize=(5, 12),
     color_alt_rows=True,
@@ -75,5 +70,5 @@ fp.forestplot(
 )
 path2img = DIR2DOCS_IMG / cohort_name
 path2img.mkdir(exist_ok=True, parents=True)
-# plt.savefig(path2img / f"{expe_name}.pdf", bbox_inches="tight")
+plt.savefig(path2img / f"{expe_name}.pdf", bbox_inches="tight")
 # %%

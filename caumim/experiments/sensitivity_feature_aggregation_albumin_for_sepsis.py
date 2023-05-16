@@ -13,13 +13,20 @@ immortal_time_bias_config = Bunch(
         "experience_grid_dict": {
             "event_aggregations": [
                 {"first": pl.col(COLNAME_VALUE).first()},
-                # {"last": pl.col(COLNAME_VALUE).last()},
+                {"last": pl.col(COLNAME_VALUE).last()},
+                {"median": pl.col(COLNAME_VALUE).median()},
+                {
+                    "first": pl.col(COLNAME_VALUE).first(),
+                    "last": pl.col(COLNAME_VALUE).last(),
+                    "median": pl.col(COLNAME_VALUE).median(),
+                },
             ],
             "estimation_method": [
                 "LinearDML",
                 "LinearDRLearner",
+                "backdoor.propensity_score_weighting",
             ],
-            "estimator": [ESTIMATOR_RF],
+            "estimator": [ESTIMATOR_RIDGE, ESTIMATOR_RF],
         },
         "fraction": 1,
         "random_state": 0,
@@ -29,7 +36,7 @@ immortal_time_bias_config = Bunch(
 cohort_names = [
     # "albumin_for_sepsis__obs_0f25d",
     "albumin_for_sepsis__obs_1d",
-    "albumin_for_sepsis__obs_3d",
+    # "albumin_for_sepsis__obs_3d",
 ]
 
 if __name__ == "__main__":
@@ -38,5 +45,5 @@ if __name__ == "__main__":
         cohort_config["cohort_folder"] = DIR2COHORT / cohort_name_
         cohort_config[
             "expe_name"
-        ] = "immortal_time_bias_double_robust_forest_agg_last"
+        ] = "sensitivity_feature_aggregation_albumin_for_sepsis"
         run_sensitivity_experiment(cohort_config)

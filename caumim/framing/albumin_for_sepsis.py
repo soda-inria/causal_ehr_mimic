@@ -169,6 +169,7 @@ def get_population(cohort_config):
         first_albumin_in24h[COLNAME_INTERVENTION_START]
         > first_albumin_in24h[COLNAME_INCLUSION_START]
     ]
+
     # 4- Define treatment and control population:
     target_trial_population = target_population.merge(
         first_albumin_in24h[
@@ -183,6 +184,16 @@ def get_population(cohort_config):
         .notnull()
         .astype(int)
     )
+    # target_trial_population[COLNAME_FOLLOWUP_START] = target_trial_population[
+    #     COLNAME_INCLUSION_START
+    # ]
+    # # forcing followup to be either inclusion or treatment start.
+    # # It introduces a blan
+    # mask_treated = target_trial_population[COLNAME_INTERVENTION_STATUS] == 1
+    # target_trial_population.loc[
+    #     mask_treated,
+    #     COLNAME_FOLLOWUP_START,
+    # ] = target_trial_population.loc[mask_treated, COLNAME_INTERVENTION_START]
 
     # 5 - Define outcomes
     # 28-days and 90-days mortality

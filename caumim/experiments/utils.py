@@ -11,7 +11,12 @@ from sklearn.impute import SimpleImputer
 from sklearn.pipeline import Pipeline, make_pipeline
 from sklearn.preprocessing import OneHotEncoder
 
-from caumim.constants import RESULT_ATE, RESULT_ATE_LB, RESULT_ATE_UB
+from caumim.constants import (
+    RANDOM_STATE,
+    RESULT_ATE,
+    RESULT_ATE_LB,
+    RESULT_ATE_UB,
+)
 
 from econml.dr import LinearDRLearner
 from econml.metalearners import TLearner
@@ -128,6 +133,7 @@ class InferenceWrapper(BaseEstimator):
                     model_regression=self.outcome_pipeline["estimator"],
                     min_propensity=0.001,
                     cv=5,
+                    random_state=RANDOM_STATE,
                 )
                 dr_learner.fit(
                     y,
@@ -158,6 +164,7 @@ class InferenceWrapper(BaseEstimator):
                     model_y=self.outcome_pipeline["estimator"],
                     discrete_treatment=True,
                     cv=5,
+                    random_state=RANDOM_STATE,
                 )
                 dml_learner.fit(
                     y,
@@ -168,7 +175,7 @@ class InferenceWrapper(BaseEstimator):
                 )
                 self.inference_estimator_ = dml_learner
             elif self.estimation_method == "CausalForest":
-                forest_learner = CausalForest()
+                forest_learner = CausalForest(random_state=RANDOM_STATE)
                 forest_learner.fit(
                     X=X_,
                     T=a,

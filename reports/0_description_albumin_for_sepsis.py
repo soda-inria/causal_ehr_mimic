@@ -74,8 +74,9 @@ event_features, feature_types = get_albumin_events_zhou_baseline(
 )
 feature_types["binary_features"] += [
     "Female",
-    "Emergency admission",
-    "Insurance, Medicare",
+    "White",
+    COLNAME_EMERGENCY_ADMISSION,
+    COLNAME_INSURANCE_MEDICARE,
 ]
 feature_types["numerical_features"] += ["admission_age"]
 
@@ -95,6 +96,7 @@ patient_features_last = event_features.sort(
 baseline_statics = [
     "admission_age",
     "Female",
+    "White",
     COLNAME_EMERGENCY_ADMISSION,
     COLNAME_INSURANCE_MEDICARE,
 ]
@@ -174,10 +176,10 @@ table_1"""
 from tableone import TableOne
 
 # To avoid plotting both category for binary features:
-limit_binary = {
-    k: 1
-    for k in [*feature_types["binary_features"], *categorical_features_one_hot]
-}
+# limit_binary = {
+#     k: 1
+#     for k in [*feature_types["binary_features"], *categorical_features_one_hot]
+# }
 mytable = TableOne(
     patient_full_features[
         [
@@ -192,21 +194,24 @@ mytable = TableOne(
         *feature_types["binary_features"],
         *categorical_features_one_hot,
     ],
-    limit=limit_binary,
+    # limit=limit_binary,
     groupby=COLNAME_INTERVENTION_STATUS,
 )
 cohort_name = albumin_cohort_folder.name
-# small esthetical changes
-table_1_ = mytable.tableone.droplevel(1)
-table_1_.columns.set_levels(
-    [
-        *list(table_1_.columns.levels[1][:2]),
-        "Cristalloids only",
-        "Cristalloids + Albumin",
-    ],
-    level=1,
+
+# dirty fix to keep only class one for  binary features
+table_1_ = mytable.tableone.reset_index()
+# %%
+table_1_ = table_1_.loc[table_1_["level_1"].isin(["", "1", "1.0"])].drop(
+    columns="level_1"
+)
+table_1_.columns = table_1_.columns.droplevel(0)
+table_1_.rename(
+    columns={"0": "Cristalloids only", "1": "Cristalloids + Albumin"},
     inplace=True,
 )
+table_1_.set_index("", inplace=True)
+# %%
 mytable.tableone = table_1_
 mytable.to_latex = mytable.tableone.to_latex
 mytable.to_latex(DIR2DOCS_IMG / cohort_name / "table1.tex")

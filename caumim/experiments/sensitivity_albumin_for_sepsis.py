@@ -36,24 +36,23 @@ sensitivity_config = Bunch(
         "cohort_folder": DIR2COHORT / "albumin_for_sepsis",
         "outcome_name": COLNAME_MORTALITY_28D,
         "experience_grid_dict": {
-            "event_aggregation": [
-                # [pl.min(), pl.max()], # TODO: test other forms of feature
-                # aggregations.
-                pl.element().first(),  # ], pl.element().first(),
-                pl.element().last(),
-                # pl.element().median(),
+            "event_aggregations": [
+                {
+                    "first": pl.col(COLNAME_VALUE).first(),
+                    "last": pl.col(COLNAME_VALUE).last(),
+                },
+                {"first": pl.col(COLNAME_VALUE).first()},
+                {"last": pl.col(COLNAME_VALUE).last()},
             ],
             "estimation_method": [
+                "backdoor.propensity_score_matching",
                 "backdoor.propensity_score_weighting",
                 "LinearDML",
                 "TLearner",
                 "LinearDRLearner",
-                # "CausalForest",
+                "CausalForest",
             ],
-            "estimator": [
-                # ESTIMATOR_RIDGE,
-                ESTIMATOR_RF
-            ],
+            "estimator": [ESTIMATOR_RIDGE, ESTIMATOR_RF],
         },
         "fraction": 1,
         "random_state": 0,
@@ -64,6 +63,8 @@ sensitivity_config = Bunch(
 def run_sensitivity_experiment(config):
     cohort_folder = config.cohort_folder
     if "expe_name" not in config.keys():
+        config["expe_name"] = None
+    if config.expe_name is None:
         expe_name = datetime.now().strftime("%Y%m%d%H%M%S")
         log_folder = (
             DIR2EXPERIENCES
@@ -114,7 +115,7 @@ def run_sensitivity_experiment(config):
         target_trial_population
     )
     experience_grid_dict = {
-        "event_aggregation": config.experience_grid_dict["event_aggregation"],
+        "event_aggregations": config.experience_grid_dict["event_aggregations"],
         "estimation_method": config.experience_grid_dict["estimation_method"],
         "estimator": config.experience_grid_dict["estimator"],
     }
@@ -132,7 +133,7 @@ def run_sensitivity_experiment(config):
         RESULT_ATE: dm.results.RiskDifference[1],
         RESULT_ATE_LB: dm.results.RiskDifference[1],
         RESULT_ATE_UB: dm.results.RiskDifference[1],
-        "event_aggregation": str(None),
+        "event_aggregations": str(None),
         "estimation_method": "Difference in mean",
         "treatment_model": str(None),
         "outcome_model": str(None),
@@ -150,15 +151,29 @@ def run_sensitivity_experiment(config):
         t0 = datetime.now()
         logger.info(f"Running {run_config}")
         # Variable aggregation
-        # TODO: should rewrite make_count with polars.
-        patient_features_aggregated = event_features.sort(
-            [COLNAME_PATIENT_ID, COLNAME_START]
+        aggregate_functions = {
+            k: v.alias(k) for k, v in run_config["event_aggregations"].items()
+        }
+        aggregation_names = list(aggregate_functions.keys())
+        patient_features_aggregated = (
+            event_features.sort([COLNAME_PATIENT_ID, COLNAME_START])
+            .groupby(STAY_KEYS + [COLNAME_CODE])
+            .agg(list(aggregate_functions.values()))
         ).pivot(
             index=STAY_KEYS,
             columns=COLNAME_CODE,
-            values="value",
-            aggregate_function=run_config["event_aggregation"],
+            values=aggregation_names,
+            aggregate_function=None,
         )
+        # particular case when there is only one aggregation function
+        if len(aggregate_functions) == 1:
+            patient_features_aggregated.columns = [
+                f"{aggregation_names[0]}_code_{col}"
+                if col not in STAY_KEYS
+                else col
+                for col in patient_features_aggregated.columns
+            ]
+
         event_features_names = list(
             set(patient_features_aggregated.columns).difference(set(STAY_KEYS))
         )
@@ -174,15 +189,29 @@ def run_sensitivity_experiment(config):
                 outcome_name,
             ]
         ].to_pandas()
+        colnames_binary_features = [
+            f"{agg_name_}_code_{col}"
+            for agg_name_ in aggregation_names
+            for col in feature_types.binary_features
+        ]
 
-        X[feature_types.binary_features] = X[
-            feature_types.binary_features
-        ].fillna(value=0)
-
+        colnames_numerical_features = [
+            f"{agg_name_}_code_{col}"
+            for agg_name_ in aggregation_names
+            for col in feature_types.numerical_features
+        ]
+        colnames_categorical_features = [
+            f"{agg_name_}_code_{col}"
+            for agg_name_ in aggregation_names
+            for col in feature_types.categorical_features
+        ]
+        X[colnames_binary_features] = X[colnames_binary_features].fillna(
+            value=0
+        )
         # 3 - Identification and estimation
         column_transformer = make_column_transformer(
-            numerical_features=feature_types.numerical_features,
-            categorical_features=feature_types.categorical_features,
+            numerical_features=colnames_numerical_features,
+            categorical_features=colnames_categorical_features,
         )
         # Both treatment and outcome models are the same models for now.
         estimator_config = run_config["estimator"]
@@ -230,7 +259,7 @@ def run_sensitivity_experiment(config):
         inference_wrapper.fit(X_a, y)
         results = inference_wrapper.predict(X=X_a)
 
-        results["event_aggregation"] = str(run_config["event_aggregation"])
+        results["event_aggregations"] = str(aggregation_names)
         results["estimation_method"] = run_config["estimation_method"]
         results["treatment_model"] = estimator_name
         results["outcome_model"] = estimator_name

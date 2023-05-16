@@ -14,6 +14,7 @@ from caumim.variables.utils import (
     feature_emergency_at_admission,
     feature_insurance_medicare,
 )
+from caumim.variables.aggregation import get_event_aggregation_polars
 
 from sklearn import clone
 from sklearn.pipeline import make_pipeline
@@ -65,18 +66,24 @@ event_features, feature_types = get_albumin_events_zhou_baseline(
     target_trial_population
 )
 # %%
-patient_features_aggregated = event_features.sort(
-    [COLNAME_PATIENT_ID, COLNAME_START]
+aggregate_functions = {
+    "first": pl.col(COLNAME_VALUE).first(),
+    "last": pl.col(COLNAME_VALUE).last(),
+}
+aggregate_functions = {k: v.alias(k) for k, v in aggregate_functions.items()}
+patient_features_aggregated = (
+    event_features.sort([COLNAME_PATIENT_ID, COLNAME_START])
+    .groupby(STAY_KEYS + [COLNAME_CODE])
+    .agg(list(aggregate_functions.values()))
 ).pivot(
     index=STAY_KEYS,
     columns=COLNAME_CODE,
-    values="value",
-    aggregate_function=pl.element().last(),
+    values=list(aggregate_functions.keys()),
 )
 event_features_names = list(
     set(patient_features_aggregated.columns).difference(set(STAY_KEYS))
 )
-X = patient_features_aggregated.join(
+X_list = patient_features_aggregated.join(
     target_trial_population,
     on=STAY_KEYS,
     how="inner",
@@ -89,16 +96,16 @@ X = patient_features_aggregated.join(
     ]
 ].to_pandas()
 
-X[feature_types.binary_features] = X[feature_types.binary_features].fillna(
-    value=0
-)
+X_list[feature_types.binary_features] = X_list[
+    feature_types.binary_features
+].fillna(value=0)
 column_transformer = make_column_transformer(
     numerical_features=feature_types.numerical_features,
     categorical_features=feature_types.categorical_features,
 )
 # preview the feature preprocessing (imputation, categories handling and standardization)
 column_transformer_preview = clone(column_transformer)
-transformed_features_preview = column_transformer_preview.fit_transform(X)
+transformed_features_preview = column_transformer_preview.fit_transform(X_list)
 transformed_features_preview = pd.DataFrame(
     transformed_features_preview,
     columns=column_transformer_preview.get_feature_names_out(),
@@ -137,11 +144,11 @@ outcome_pipeline = make_random_search_pipeline(
 )
 outcome_pipeline
 # %%
-a = X[COLNAME_INTERVENTION_STATUS]
-y = X[outcome_name]
-treatment_pipeline.fit(X, a)
+a = X_list[COLNAME_INTERVENTION_STATUS]
+y = X_list[outcome_name]
+treatment_pipeline.fit(X_list, a)
 treatment_estimator_w_best_HP = treatment_pipeline.best_estimator_
-outcome_pipeline.fit(X, y)
+outcome_pipeline.fit(X_list, y)
 outcome_estimator_w_best_HP = outcome_pipeline.best_estimator_
 # %%
 # ### G-computation with T-learner
@@ -152,7 +159,7 @@ from econml.inference import BootstrapInference
 # have to preprocess the data before fitting to the estimator. A practice to be
 # avoided usually, because it can lead to [information leakage](https://en.wikipedia.org/wiki/Leakage_(machine_learning)).
 X_transformed = column_transformer.fit_transform(
-    X.drop([COLNAME_INTERVENTION_STATUS, outcome_name], axis=1)
+    X_list.drop([COLNAME_INTERVENTION_STATUS, outcome_name], axis=1)
 )
 X_transformed = pd.DataFrame(
     X_transformed, columns=column_transformer.get_feature_names_out()
@@ -240,7 +247,7 @@ results
 from econml.grf import CausalForest
 
 transformed_data = column_transformer.fit_transform(
-    X.drop([COLNAME_INTERVENTION_STATUS, outcome_name], axis=1),
+    X_list.drop([COLNAME_INTERVENTION_STATUS, outcome_name], axis=1),
 )
 transformed_data = pd.DataFrame(
     transformed_data, columns=column_transformer.get_feature_names_out()
@@ -248,8 +255,8 @@ transformed_data = pd.DataFrame(
 forest_learner = CausalForest()
 forest_learner.fit(
     X=transformed_data,
-    y=X[outcome_name],
-    T=X[COLNAME_INTERVENTION_STATUS],
+    y=X_list[outcome_name],
+    T=X_list[COLNAME_INTERVENTION_STATUS],
 )
 (
     ate_point_estimates,
@@ -294,7 +301,7 @@ from zepid import RiskDifference
 # Any estimator having larger bound than the naive DM estimator should not be
 # reliable.
 dm = RiskDifference()
-dm.fit(X, COLNAME_INTERVENTION_STATUS, outcome_name)
+dm.fit(X_list, COLNAME_INTERVENTION_STATUS, outcome_name)
 dm_results = {
     RESULT_ATE: dm.results.RiskDifference[1],
     RESULT_ATE_LB: dm.results.LowerBound[1],
