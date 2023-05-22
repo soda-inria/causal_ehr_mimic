@@ -1,4 +1,5 @@
-from typing import Tuple
+from dataclasses import dataclass
+from typing import List, Tuple
 import polars as pl
 from sklearn.utils import Bunch
 
@@ -22,7 +23,7 @@ from caumim.variables.utils import (
     get_measurement_from_mimic_concept_tables,
     restrict_event_to_observation_period,
 )
-from caumim.utils import to_lazyframe
+from caumim.utils import to_lazyframe, to_polars
 
 from joblib import Memory
 
@@ -30,10 +31,81 @@ location = "./cachedir"
 memory = Memory(location, verbose=0)
 
 
+@dataclass
+class VariableTypes:
+    binary_features: List[str] = None
+    categorical_features: List[str] = None
+    numerical_features: List[str] = None
+
+
+@memory.cache()
+def get_comorbidity(
+    target_trial_population: pl.DataFrame,
+) -> Tuple[pl.DataFrame, VariableTypes]:
+    """These comorbidities are computed [from icd codes](https://github.com/MIT-LCP/mimic-code/blob/main/mimic-iv/concepts/comorbidity/charlson.sql)"""
+    comorbidities = pl.scan_parquet(DIR2MIMIC / "mimiciv_derived.charlson/")
+    index_cols = [
+        COLNAME_PATIENT_ID,
+        COLNAME_HADM_ID,
+        COLNAME_ICUSTAY_ID,
+        "dischtime",
+    ]
+    comorbidities_filtered = comorbidities.join(
+        to_lazyframe(target_trial_population).select(index_cols),
+        on=[COLNAME_PATIENT_ID, COLNAME_HADM_ID],
+        how="inner",
+    )
+    # only keep non null diagnosis
+    comorbidities_event = (
+        comorbidities_filtered.melt(
+            id_vars=index_cols,
+            value_vars=[
+                "myocardial_infarct",
+                "congestive_heart_failure",
+                "peripheral_vascular_disease",
+                "cerebrovascular_disease",
+                "dementia",
+                "chronic_pulmonary_disease",
+                "rheumatic_disease",
+                "peptic_ulcer_disease",
+                "mild_liver_disease",
+                "diabetes_without_cc",
+                "diabetes_with_cc",
+                "paraplegia",
+                "renal_disease",
+                "malignant_cancer",
+                "severe_liver_disease",
+                "metastatic_solid_tumor",
+                "aids",
+                "charlson_comorbidity_index",
+            ],
+            variable_name=COLNAME_CODE,
+            value_name=COLNAME_VALUE,
+        )
+        .filter(
+            (pl.col(COLNAME_VALUE) != 0)
+            | (pl.col(COLNAME_CODE) == "charlson_comorbidity_index")
+        )
+        .rename({"dischtime": COLNAME_START})
+        .collect()
+        .with_columns(
+            pl.lit("condition").alias(COLNAME_DOMAIN),
+            pl.lit("charlson_comorbidity_index").alias(COLNAME_LABEL),
+            pl.col(COLNAME_START).alias(COLNAME_END),
+            pl.col(COLNAME_VALUE).cast(pl.Float64).alias(COLNAME_VALUE),
+        )
+    )
+    # Add feature types
+    feature_types = VariableTypes(
+        binary_features=comorbidities_event[COLNAME_CODE].unique().to_list(),
+    )
+    return comorbidities_event, feature_types
+
+
 @memory.cache()
 def get_albumin_events_zhou_baseline(
     target_trial_population: pl.DataFrame,
-) -> Tuple[pl.DataFrame, Bunch]:
+) -> Tuple[pl.DataFrame, VariableTypes]:
     """Get the baseline variables from the [Zhou et al., 2021](https://link.springer.com/article/10.1186/s13613-021-00830-8) paper.
 
     Returns:
@@ -324,31 +396,30 @@ def get_albumin_events_zhou_baseline(
     event_features = event_features.filter(~event_features.is_duplicated())
 
     # Add feature types
-    feature_types = Bunch(
-        **{
-            "binary_features": [
-                "Glycopeptide",  # J01XA
-                "Beta-lactams",  # "J01C",
-                "Carbapenems",  # "J01DH",
-                "Aminoglycosides",  # "J01G",
-                "suspected_infection_blood",
-                "RRT",
-                "ventilation",
-                "vasopressors",
-            ],
-            "categorical_features": ["aki_stage"],
-            "numerical_features": [
-                "SOFA",
-                "SAPSII",
-                "Weight",
-                "temperature",
-                "mbp",
-                "resp_rate",
-                "heart_rate",
-                "spo2",
-                "lactate",
-                "urineoutput",
-            ],
-        }
+    feature_types = VariableTypes(
+        binary_features=[
+            "Glycopeptide",  # J01XA
+            "Beta-lactams",  # "J01C",
+            "Carbapenems",  # "J01DH",
+            "Aminoglycosides",  # "J01G",
+            "suspected_infection_blood",
+            "RRT",
+            "ventilation",
+            "vasopressors",
+        ],
+        categorical_features=["aki_stage"],
+        numerical_features=[
+            "SOFA",
+            "SAPSII",
+            "Weight",
+            "temperature",
+            "mbp",
+            "resp_rate",
+            "heart_rate",
+            "spo2",
+            "lactate",
+            "urineoutput",
+        ],
     )
+
     return event_features, feature_types

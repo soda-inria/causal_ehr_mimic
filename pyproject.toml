@@ -45,6 +45,7 @@ forestplot = "^0.3.1"
 #cython = "^0.29.34"
 econml = "^0.14.0"
 dowhy = "^0.9.1"
+schemdraw = "^0.16"
 
 [tool.poetry.group.notebooks.dependencies]
 # Jupyter Notebook

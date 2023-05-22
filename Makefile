@@ -188,6 +188,10 @@ test-docs:
 # Self Documenting Commands                                                     #
 #################################################################################
 
+.PHONY: cp-img
+cp-img:
+	cp -r docs/source/_static/img ~/projets/inria/papiers/causal_inference_tuto/img/caumim
+
 .DEFAULT_GOAL := help
 
 # Inspired by <http://marmelab.com/blog/2016/02/29/auto-documented-makefile.html>

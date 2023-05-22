@@ -1,4 +1,5 @@
 from typing import Dict, List
+from attr import dataclass
 from loguru import logger
 import numpy as np
 import polars as pl
@@ -9,7 +10,93 @@ from caumim.constants import (
     COLNAME_PATIENT_ID,
     COLNAME_START,
     COLNAME_VALUE,
+    STAY_KEYS,
 )
+
+
+@dataclass
+class PolarsColumnAggregation:
+    columns: List[str]
+    aggregation: pl.Expr
+
+
+def aggregate_medically_sepsis_albumin(
+    event_features: pl.DataFrame,
+) -> pl.DataFrame:
+    """
+    A medically meaningful aggregation of albumin for sepsis, for table 1
+    (flatten the time dimension) with meaningful aggregations with the
+    objective to summarize the stay to a clinician.
+
+    Args:
+        event_features (pl.DataFrame): _description_
+    """
+    medical_aggregation = {
+        "max": PolarsColumnAggregation(
+            ["SOFA", "SAPSII", "lactate", "aki_stage"],
+            pl.col(COLNAME_VALUE).max(),
+        ),
+        "median": PolarsColumnAggregation(
+            [
+                "spo2",
+                "heart_rate",
+                "resp_rate",
+                "Weight",
+                "temperature",
+                "mbp",
+            ],
+            pl.col(COLNAME_VALUE).median(),
+        ),
+        "last": PolarsColumnAggregation(
+            [
+                "renal_disease",
+                "malignant_cancer",
+                "metastatic_solid_tumor",
+                "myocardial_infarct",
+                "diabetes_with_cc",
+                "diabetes_without_cc",
+                "severe_liver_disease",
+                "Beta-lactams",
+                "Glycopeptide",
+                "vasopressors",
+                "Carbapenems",
+                "Aminoglycosides",
+                "suspected_infection_blood",
+                "RRT",
+                "ventilation",
+            ],
+            pl.col(COLNAME_VALUE).last(),
+        ),
+        "sum": PolarsColumnAggregation(
+            ["urineoutput"], pl.col(COLNAME_VALUE).sum()
+        ),
+    }
+    aggregated_features_list = []
+    for aggregation_name, aggregation_config in medical_aggregation.items():
+        aggregated_features_list.append(
+            (
+                event_features.filter(
+                    pl.col(COLNAME_CODE).is_in(aggregation_config.columns)
+                )
+                .sort([COLNAME_PATIENT_ID, COLNAME_START])
+                .groupby(STAY_KEYS + [COLNAME_CODE])
+                .agg(aggregation_config.aggregation)
+            ).pivot(
+                index=STAY_KEYS,
+                columns=COLNAME_CODE,
+                values=COLNAME_VALUE,
+                separator=f"_{aggregation_name}",
+            )
+        )
+    aggregated_events = aggregated_features_list[0]
+
+    for agg_ in aggregated_features_list[1:]:
+        aggregated_events = aggregated_events.join(
+            agg_, on=STAY_KEYS, how="outer"
+        )
+
+    return aggregated_events
+
 
 PERIOD_MAP = {"all": [100, 10, 25, 50, -10, -25, -50], "100": [100]}
 DEFAULT_AGG_FUNCTIONS = {

@@ -7,7 +7,9 @@ from caumim.variables.selection import (
     get_albumin_events_zhou_baseline,
     get_antibiotics_event_from_atc4,
     get_antibiotics_event_from_drug_name,
+    get_comorbidity,
 )
+from caumim.variables.aggregation import aggregate_medically_sepsis_albumin
 from caumim.variables.utils import (
     feature_emergency_at_admission,
     feature_insurance_medicare,
@@ -69,27 +71,73 @@ print(deltas[["count", "50%", "IR"]])
 # %%
 # Variable selection
 # Get baseline events
-event_features, feature_types = get_albumin_events_zhou_baseline(
-    pd.read_parquet(albumin_cohort_folder / FILENAME_TARGET_POPULATION)
+inclusion_criteria_full_stay = pd.read_parquet(
+    albumin_cohort_folder / FILENAME_TARGET_POPULATION
 )
-feature_types["binary_features"] += [
+# Change the inclusion criteria to be the full stay / or the first 24 hours
+# instead of only up to the intervention.
+acceptable_followup_windows = ["full_icu_stay", "24h", "up_to_intervention"]
+followup_window = "24h"
+
+if followup_window == "full_icu_stay":
+    inclusion_criteria_full_stay[
+        COLNAME_INCLUSION_START
+    ] = inclusion_criteria_full_stay["outtime"]
+elif followup_window == "24h":
+    inclusion_criteria_full_stay[
+        COLNAME_INCLUSION_START
+    ] = inclusion_criteria_full_stay["intime"] + pd.Timedelta(24, unit="h")
+elif followup_window == "up_to_intervention":
+    pass
+else:
+    raise ValueError(
+        f"followup_window must be one of {acceptable_followup_windows}"
+    )
+# %%
+## Adding comorbidities
+comorbidities_events, comorbidities_feature_types = get_comorbidity(
+    inclusion_criteria_full_stay
+)
+albumin_comorbidities = [
+    "myocardial_infarct",
+    "malignant_cancer",
+    "diabetes_with_cc",
+    "diabetes_without_cc",
+    "metastatic_solid_tumor",
+    "severe_liver_disease",
+    "renal_disease",
+]
+comorbidities_events = comorbidities_events.filter(
+    pl.col("code").is_in(albumin_comorbidities)
+).select(COLNAMES_EVENTS)
+# %%
+event_features, feature_types = get_albumin_events_zhou_baseline(
+    inclusion_criteria_full_stay
+)
+# Add the static feature types
+feature_types.binary_features += [
     "Female",
     "White",
     COLNAME_EMERGENCY_ADMISSION,
     COLNAME_INSURANCE_MEDICARE,
 ]
-feature_types["numerical_features"] += ["admission_age"]
+feature_types.numerical_features += ["admission_age"]
 
 print(event_features.shape)
 event_features["code"].value_counts().sort("counts", descending=True)
-# %% Variable aggregation
-patient_features_last = event_features.sort(
-    [COLNAME_PATIENT_ID, COLNAME_START]
-).pivot(
-    index=STAY_KEYS,
-    columns=COLNAME_CODE,
-    values="value",
-    aggregate_function=pl.element().last(),
+
+event_features = pl.concat([event_features, comorbidities_events])
+feature_types.binary_features += albumin_comorbidities
+# %%
+# medically grounded variable aggregation
+aggregated_events = aggregate_medically_sepsis_albumin(
+    event_features=event_features
+)
+# normalize urine output:
+aggregated_events = aggregated_events.with_columns(
+    (pl.col("urineoutput") / pl.col("Weight").fill_null(70)).alias(
+        "urineoutput"
+    )
 )
 # %%
 # Join with static features:
@@ -101,7 +149,7 @@ baseline_statics = [
     COLNAME_INSURANCE_MEDICARE,
 ]
 
-patient_full_features = patient_features_last.join(
+patient_full_features = aggregated_events.join(
     to_polars(target_trial_population).select(
         [
             *STAY_KEYS,
@@ -123,9 +171,9 @@ patient_full_features = patient_features_last.join(
 patient_matrix = patient_full_features[
     [
         COLNAME_PATIENT_ID,
-        *feature_types["binary_features"],
-        *feature_types["categorical_features"],
-        *feature_types["numerical_features"],
+        *feature_types.binary_features,
+        *feature_types.categorical_features,
+        *feature_types.numerical_features,
         COLNAME_MORTALITY_28D,
         COLNAME_MORTALITY_90D,
         COLNAME_INTERVENTION_STATUS,
@@ -134,13 +182,13 @@ patient_matrix = patient_full_features[
 # %% [markdown]
 # ## Table 1
 # %%
-for col in feature_types["binary_features"]:
+for col in feature_types.binary_features:
     patient_full_features[col] = patient_full_features[col].fillna(0)
 
 from sklearn.preprocessing import OneHotEncoder
 
 categorical_features_one_hot = []
-for cat_col in feature_types["categorical_features"]:
+for cat_col in feature_types.categorical_features:
     enc = OneHotEncoder()
     categorical_encode = enc.fit_transform(
         patient_full_features[[cat_col]]
@@ -157,41 +205,25 @@ for cat_col in feature_types["categorical_features"]:
     )
 categorical_features_one_hot += categorical_encode.columns.tolist()
 # %%
-"""table_1 = (
-    patient_full_features[
-        [
-            COLNAME_INTERVENTION_STATUS,
-            *feature_types["binary_features"],
-            *categorical_features_one_hot,
-            *feature_types["numerical_features"],
-            *COMMON_DELTAS,
-        ]
-    ]
-    .groupby(COLNAME_INTERVENTION_STATUS)
-    .mean()
-    .transpose()
-)
-table_1"""
-
 from tableone import TableOne
 
 # To avoid plotting both category for binary features:
 # limit_binary = {
 #     k: 1
-#     for k in [*feature_types["binary_features"], *categorical_features_one_hot]
+#     for k in [*feature_types.binary_features, *categorical_features_one_hot]
 # }
 mytable = TableOne(
     patient_full_features[
         [
             COLNAME_INTERVENTION_STATUS,
-            *feature_types["binary_features"],
+            *feature_types.binary_features,
             *categorical_features_one_hot,
-            *feature_types["numerical_features"],
+            *feature_types.numerical_features,
             *COMMON_DELTAS,
         ]
     ],
     categorical=[
-        *feature_types["binary_features"],
+        *feature_types.binary_features,
         *categorical_features_one_hot,
     ],
     # limit=limit_binary,
@@ -201,7 +233,6 @@ cohort_name = albumin_cohort_folder.name
 
 # dirty fix to keep only class one for  binary features
 table_1_ = mytable.tableone.reset_index()
-# %%
 table_1_ = table_1_.loc[table_1_["level_1"].isin(["", "1", "1.0"])].drop(
     columns="level_1"
 )
@@ -211,8 +242,8 @@ table_1_.rename(
     inplace=True,
 )
 table_1_.set_index("", inplace=True)
-# %%
 mytable.tableone = table_1_
 mytable.to_latex = mytable.tableone.to_latex
-mytable.to_latex(DIR2DOCS_IMG / cohort_name / "table1.tex")
+mytable.to_latex(DIR2DOCS_IMG / cohort_name / f"table1_{followup_window}.tex")
+mytable.tableone
 # %%
