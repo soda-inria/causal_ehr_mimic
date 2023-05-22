@@ -1,40 +1,45 @@
 # %%
 # %load_ext autoreload
 # %autoreload 2
-import polars as pl
+import pickle
 import pandas as pd
+import polars as pl
+from sklearn.preprocessing import OneHotEncoder
+from tableone import TableOne
+
+from caumim.constants import *
+from caumim.description.utils import COMMON_DELTAS, add_delta, describe_delta
+from caumim.framing.albumin_for_sepsis import COHORT_CONFIG_ALBUMIN_FOR_SEPSIS
+from caumim.framing.utils import create_cohort_folder
+from caumim.utils import to_polars
+from caumim.variables.aggregation import aggregate_medically_sepsis_albumin
 from caumim.variables.selection import (
-    get_albumin_events_zhou_baseline,
     get_antibiotics_event_from_atc4,
     get_antibiotics_event_from_drug_name,
     get_comorbidity,
+    get_event_covariates_albumin_zhou,
 )
-from caumim.variables.aggregation import aggregate_medically_sepsis_albumin
 from caumim.variables.utils import (
     feature_emergency_at_admission,
     feature_insurance_medicare,
 )
+from caumim.description.utils import Flowchart
 
-from caumim.framing.albumin_for_sepsis import (
-    COHORT_CONFIG_ALBUMIN_FOR_SEPSIS,
-)
-from caumim.framing.utils import create_cohort_folder
-from caumim.constants import *
-from caumim.description.utils import COMMON_DELTAS, add_delta, describe_delta
-from caumim.utils import to_polars
-
-# %%
+# list available mimic tables
 tables = [file_.name for file_ in list(DIR2MIMIC.iterdir())]
 tables.sort(reverse=True)
 print(tables)
-
+# %% [markdown]
+# This notebook creates:
+# - A selection flowchart from the albumin for sepsis cohort.
+# - A table 1 description of the cohort during the first 24 hours.
+# # Selection flowchart
 # %%
-# Load target population
+# ## Load target population
 albumin_cohort_folder = create_cohort_folder(COHORT_CONFIG_ALBUMIN_FOR_SEPSIS)
 target_trial_population = pd.read_parquet(
     albumin_cohort_folder / FILENAME_TARGET_POPULATION
 )
-
 # Create static features
 # demographics
 target_trial_population = feature_emergency_at_admission(
@@ -57,7 +62,38 @@ target_trial_population = (
     .to_pandas()
 )
 # %%
-# deltas
+inclusion_ids = pickle.load(
+    open(str(albumin_cohort_folder / FILENAME_INCLUSION_CRITERIA), "rb")
+)
+# %%
+flowchart_name = "flowchart_albumin_for_sepsis"
+f = Flowchart()
+last_criteria = inclusion_ids["Initial"]
+for criterion_name in inclusion_ids.keys():
+    intersection_with_previous = set(last_criteria).intersection(
+        set(inclusion_ids[criterion_name])
+    )
+    last_criteria = intersection_with_previous
+    print(f"{criterion_name}: {len(intersection_with_previous)} patients")
+
+F = Flowchart(
+    data=inclusion_ids,
+    initial_description="Initial population",
+)
+for criterion_name in inclusion_ids.keys():
+    if criterion_name != "initial":
+        F.add_criterion(
+            criterion_name=criterion_name, description=criterion_name
+        )
+F.generate_flowchart(alternate=True)
+F.save(DIR2DOCS_COHORT / (flowchart_name + ".png"))
+F.save(DIR2DOCS_COHORT / (flowchart_name + ".svg"))
+# %% [markdown]
+# # Table 1
+# %%
+
+# %%
+# Adding time deltas
 target_trial_population.head()
 target_trial_population["delta"] = (
     target_trial_population["dod"]
@@ -111,7 +147,7 @@ comorbidities_events = comorbidities_events.filter(
     pl.col("code").is_in(albumin_comorbidities)
 ).select(COLNAMES_EVENTS)
 # %%
-event_features, feature_types = get_albumin_events_zhou_baseline(
+event_features, feature_types = get_event_covariates_albumin_zhou(
     inclusion_criteria_full_stay
 )
 # Add the static feature types
@@ -185,7 +221,6 @@ patient_matrix = patient_full_features[
 for col in feature_types.binary_features:
     patient_full_features[col] = patient_full_features[col].fillna(0)
 
-from sklearn.preprocessing import OneHotEncoder
 
 categorical_features_one_hot = []
 for cat_col in feature_types.categorical_features:
@@ -205,8 +240,6 @@ for cat_col in feature_types.categorical_features:
     )
 categorical_features_one_hot += categorical_encode.columns.tolist()
 # %%
-from tableone import TableOne
-
 # To avoid plotting both category for binary features:
 # limit_binary = {
 #     k: 1

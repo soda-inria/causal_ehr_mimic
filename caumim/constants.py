@@ -34,6 +34,7 @@ DIR2DOCS_EXPERIENCES.mkdir(parents=True, exist_ok=True)
 
 # Default file names
 FILENAME_TARGET_POPULATION = "target_population"
+FILENAME_INCLUSION_CRITERIA = "inclusion_criteria.pkl"
 
 # COlUMNS
 # Colnames of the event table

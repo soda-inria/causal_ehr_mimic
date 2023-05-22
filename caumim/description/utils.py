@@ -4,6 +4,7 @@ from typing import Dict, Iterable, Optional, Set, Union
 
 import matplotlib
 from schemdraw import Drawing, flow
+import pandas as pd
 
 from caumim.constants import (
     COLNAME_DELTA_INCLUSION_INTIME,
@@ -76,9 +77,9 @@ def describe_delta(target_trial_population, unit="hours"):
 
 
 def to_set(data: Iterable):
-    if isinstance(data, Series.__args__):
+    if isinstance(data, pd.Series.__args__):
         ids = data.to_numpy()
-    elif isinstance(data, DataFrame.__args__):
+    elif isinstance(data, pd.DataFrame.__args__):
         assert (
             len(data.columns) == 1
         ), "A DataFrame with more than 1 column was provided"
@@ -216,6 +217,7 @@ class Criterion:
         return self.__repr__()
 
 
+# TODO: add the discrimination steps
 class Flowchart:
     def __init__(
         self,

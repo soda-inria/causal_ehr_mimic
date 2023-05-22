@@ -1,44 +1,41 @@
 from datetime import datetime
 from pathlib import Path
-from typing import Dict
+from typing import Dict, List, Tuple
 import polars as pl
-from caumim.constants import DIR2COHORT, DIR2MIMIC
+from caumim.constants import COLNAME_PATIENT_ID, DIR2COHORT, DIR2MIMIC
 import pandas as pd
 
 from caumim.utils import to_lazyframe, to_pandas
 
 
 def roll_inclusion_criteria(
-    inclusion_criteria: Dict[str, pd.DataFrame], cohort_folder: str = None
-) -> pd.DataFrame:
+    inclusion_criteria: Dict[str, pd.DataFrame]
+) -> Tuple[pd.DataFrame, Dict[str, List[str]]]:
+    """Link inclusion criteria to the target population and return the
+    target population and the inclusion ids."""
     if "inclusion_event" not in inclusion_criteria.keys():
         raise ValueError(
             "a inclusion_event dataframe must be in the inclusion criteria dictionary"
         )
-    if cohort_folder is not None:
-        cohort_path = Path(cohort_folder)
-        cohort_path.mkdir(parents=True, exist_ok=True)
-
     target_population = pl.scan_parquet(DIR2MIMIC / "mimiciv_icu.icustays/*")
-    inclusion_counts = {
-        "full_population": target_population.select(pl.n_unique("stay_id"))
-        .collect()
-        .to_numpy()[0][0]
+
+    inclusion_ids = {
+        "initial": target_population.select(COLNAME_PATIENT_ID)
+        .unique()
+        .collect()[COLNAME_PATIENT_ID]
+        .to_list()
     }
     for inclusion_name, inclusion_df in inclusion_criteria.items():
         target_population = target_population.join(
             to_lazyframe(inclusion_df), on="stay_id", how="inner"
         )
-        inclusion_counts[inclusion_name] = (
-            target_population.select(pl.n_unique("stay_id"))
-            .collect()
-            .to_numpy()[0][0]
+        inclusion_ids[inclusion_name] = (
+            target_population.select(COLNAME_PATIENT_ID)
+            .unique()
+            .collect()[COLNAME_PATIENT_ID]
+            .to_list()
         )
-    if cohort_folder is not None:
-        pd.DataFrame.from_dict(inclusion_counts, orient="index").to_csv(
-            cohort_path / "inclusion_counts.csv"
-        )
-    return to_pandas(target_population)
+    return to_pandas(target_population), inclusion_ids
 
 
 def get_base_population(
@@ -87,8 +84,10 @@ def get_cohort_hash(cohort_config: Dict):
 
 
 def create_cohort_folder(cohort_config: Dict) -> Path:
-    # cohort_hash = get_cohort_hash(cohort_config)
-    # t0 = datetime.now().strftime("%Y-%m-%d")
+    if "treatment_observation_window_unit_day" in cohort_config.keys():
+        cohort_config.cohort_name += f"__obs_{cohort_config.treatment_observation_window_unit_day}d".replace(
+            ".", "f"
+        )
     cohort_folder = DIR2COHORT / f"{cohort_config.cohort_name}"
     cohort_folder.mkdir(parents=True, exist_ok=True)
     pd.DataFrame.from_dict(

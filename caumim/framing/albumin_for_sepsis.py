@@ -1,3 +1,5 @@
+import pickle
+from typing import Dict, List, Tuple
 import pandas as pd
 from sklearn.utils import Bunch
 import polars as pl
@@ -6,9 +8,11 @@ from caumim.constants import (
     COLNAME_MORTALITY_90D,
     COLNAME_INTERVENTION_START,
     COLNAME_INTERVENTION_STATUS,
+    COLNAME_PATIENT_ID,
     DIR2COHORT,
     DIR2MIMIC,
     COLNAME_INCLUSION_START,
+    FILENAME_INCLUSION_CRITERIA,
     FILENAME_TARGET_POPULATION,
 )
 from loguru import logger
@@ -21,8 +25,13 @@ from caumim.framing.utils import (
 )
 from caumim.utils import to_lazyframe
 
+"""
+This script defines the cohort of patients that will be used for the albumin. I
+timplements the framing of the question by building: Population, Intervention,
+Control and Outcome elements as well as the Time of followup.
+"""
 
-observation_window_in_day = 3
+observation_window_in_day = 1
 COHORT_CONFIG_ALBUMIN_FOR_SEPSIS = Bunch(
     **{
         "min_age": 18,
@@ -35,14 +44,12 @@ COHORT_CONFIG_ALBUMIN_FOR_SEPSIS = Bunch(
 )
 
 
-def get_population(cohort_config):
-    # Adapt cohort_name depending on the treatment observation_window
-    cohort_config.cohort_name = (
-        cohort_config.cohort_name
-        + f"__obs_{cohort_config.treatment_observation_window_unit_day}d".replace(
-            ".", "f"
-        )
-    )
+def get_population(cohort_config) -> Tuple[pd.DataFrame, Dict[str, List[str]]]:
+    """
+    This function defines the population of interest for the albumin for sepsis.
+    It returns static information with treatment status and important timestamps such as:
+    COLNAME_INCLUSION_START, COLNAME_INTERVENTION_START and outcomes.
+    """
     cohort_folder = create_cohort_folder(cohort_config)
     # 1 - Define the inclusion events, ie. the event that defines when a patient
     # enter the cohort.
@@ -78,7 +85,7 @@ def get_population(cohort_config):
         - first_crystalloids["intime"]
     )
     # Consider only crystalloids before max_los_before_treatment
-    inclusion_event = first_crystalloids.loc[
+    crystralloids_first_24h = first_crystalloids.loc[
         (
             first_crystalloids[
                 "delta_crystalloids_icu_intime"
@@ -107,14 +114,17 @@ def get_population(cohort_config):
     sepsis3_stays = sepsis3_stays.loc[
         sepsis3_stays["sepsis3"] == True, ["stay_id"]
     ]
+    observation_window_in_hour_str = str(
+        int(24 * cohort_config.treatment_observation_window_unit_day)
+    )
     inclusion_criteria = {
         "base_population": base_population,
         "sepsis3": sepsis3_stays,
-        "inclusion_event": inclusion_event,
+        f"inclusion_event": crystralloids_first_24h,
     }
     # Run successively the inclusion criteria
-    target_population = roll_inclusion_criteria(
-        inclusion_criteria, cohort_folder=cohort_folder
+    target_population, inclusion_ids = roll_inclusion_criteria(
+        inclusion_criteria
     )
     # 3 - Define the treatment events
     albumin_itemids = [
@@ -229,7 +239,25 @@ def get_population(cohort_config):
         logger.info(
             f"Saved cohort at {cohort_folder / (FILENAME_TARGET_POPULATION)}"
         )
-    return target_population
+
+    # create inclusion criteria dictionnary
+    inclusion_ids[f"albumin_first_{observation_window_in_hour_str}h"] = (
+        target_trial_population.loc[
+            target_trial_population[COLNAME_INTERVENTION_STATUS] == 1,
+            COLNAME_PATIENT_ID,
+        ]
+        .unique()
+        .tolist()
+    )
+    inclusion_ids[
+        f"crystalloids_first_{observation_window_in_hour_str}h"
+    ] = inclusion_ids[f"inclusion_event"]
+    inclusion_ids.pop("inclusion_event")
+    pickle.dump(
+        inclusion_ids,
+        open(str(cohort_folder / FILENAME_INCLUSION_CRITERIA), "wb"),
+    )
+    return target_population, inclusion_criteria
 
 
 if __name__ == "__main__":

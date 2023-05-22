@@ -9,7 +9,7 @@ from caumim.framing.albumin_for_sepsis import COHORT_CONFIG_ALBUMIN_FOR_SEPSIS
 from caumim.framing.utils import create_cohort_folder
 from caumim.inference.utils import make_random_search_pipeline
 
-from caumim.variables.selection import get_albumin_events_zhou_baseline
+from caumim.variables.selection import get_event_covariates_albumin_zhou
 from caumim.variables.utils import (
     feature_emergency_at_admission,
     feature_insurance_medicare,
@@ -62,7 +62,7 @@ static_features = [
 outcome_name = COLNAME_MORTALITY_28D
 # %%
 # event features
-event_features, feature_types = get_albumin_events_zhou_baseline(
+event_features, feature_types = get_event_covariates_albumin_zhou(
     target_trial_population
 )
 # %%

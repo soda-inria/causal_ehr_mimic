@@ -18,7 +18,7 @@ from caumim.experiments.utils import (
 )
 from caumim.inference.utils import make_random_search_pipeline
 
-from caumim.variables.selection import get_albumin_events_zhou_baseline
+from caumim.variables.selection import get_event_covariates_albumin_zhou
 from caumim.variables.utils import (
     feature_emergency_at_admission,
     feature_insurance_medicare,
@@ -111,7 +111,7 @@ def run_sensitivity_experiment(config):
 
     # event features TODO: this is the only code specific to the albumin study.
     # I could make it more generalizable by asking for a event_features function.
-    event_features, feature_types = get_albumin_events_zhou_baseline(
+    event_features, feature_types = get_event_covariates_albumin_zhou(
         target_trial_population
     )
     experience_grid_dict = {
