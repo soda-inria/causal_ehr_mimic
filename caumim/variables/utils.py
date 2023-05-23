@@ -161,7 +161,9 @@ def get_measurement_from_mimic_concept_tables(
     return pl.concat(measurement_event_list)
 
 
-def feature_emergency_at_admission(target_population: pl.DataFrame):
+def feature_emergency_at_admission(
+    target_population: pl.DataFrame,
+) -> pl.DataFrame:
     emergency_admission = (
         pl.read_parquet(DIR2MIMIC / "mimiciv_hosp.admissions/*")
         .filter(pl.col("admission_type").is_in(["DIRECT EMER.", "EW EMER."]))

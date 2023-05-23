@@ -77,9 +77,9 @@ def describe_delta(target_trial_population, unit="hours"):
 
 
 def to_set(data: Iterable):
-    if isinstance(data, pd.Series.__args__):
+    if isinstance(data, pd.Series):
         ids = data.to_numpy()
-    elif isinstance(data, pd.DataFrame.__args__):
+    elif isinstance(data, pd.DataFrame):
         assert (
             len(data.columns) == 1
         ), "A DataFrame with more than 1 column was provided"
@@ -217,7 +217,6 @@ class Criterion:
         return self.__repr__()
 
 
-# TODO: add the discrimination steps
 class Flowchart:
     def __init__(
         self,
@@ -225,6 +224,7 @@ class Flowchart:
         data: Union[pd.DataFrame, Dict[str, Iterable]],
         concat_criterion_description: bool = True,
         to_count: str = "person_id",
+        cohort_characteristics: pd.DataFrame = None,
     ):
         """
         Main class to define an flowchart (inclusion diagram), extracted from
@@ -246,6 +246,8 @@ class Flowchart:
             Only if `data` is a DataFrame: column of `data` from which the count
             is computed. Usually, this will be the column containing patient or
             stay IDs.
+        cohort_characteristics : DataFrame, optional
+            If provided, the columns will be used to summarize excluded patients.
         """
 
         self.initial_description = initial_description
@@ -261,9 +263,15 @@ class Flowchart:
         self.final_split = None
 
         self.drawing = None
+        if cohort_characteristics is not None:
+            if self.to_count not in cohort_characteristics.columns:
+                raise ValueError(
+                    f"{to_count} is not a column of `cohort characteristics`"
+                )
+            self.cohort_characteristics = cohort_characteristics
 
     def check_data(self):
-        if isinstance(self.data, pd.DataFrame.__args__):
+        if isinstance(self.data, pd.DataFrame):
             if self.to_count not in self.data.columns:
                 raise ValueError(
                     f"The parameter `to_count` ({self.to_count}) "
@@ -284,7 +292,7 @@ class Flowchart:
             )
 
     def get_unique(self, criterion_name: Optional[str] = None):
-        if isinstance(self.data, pd.DataFrame.__args__):
+        if isinstance(self.data, pd.DataFrame):
             ids = (
                 self.data[self.to_count]
                 if criterion_name is None
@@ -355,6 +363,10 @@ class Flowchart:
             if not self.concat_criterion_description
             else (self.get_last_description() + description)
         )
+        if self.cohort_characteristics is not None:
+            excluded_description = self.get_summary_characteristics(
+                excluded_data.ids
+            )
         added_criterion = Criterion(
             description=description,
             excluded_description=excluded_description,
@@ -484,6 +496,25 @@ class Flowchart:
         self.drawing = d
 
         return d
+
+    def get_summary_characteristics(self, patient_ids: Set[str]) -> str:
+        """
+        Compute summary characteristics of a subsest of the patient IDs.
+        Only support binary characteristics, eg. Male/Female.
+        """
+        patient_characteristics = (
+            self.cohort_characteristics.merge(
+                pd.DataFrame({self.to_count: list(patient_ids)}),
+                on=self.to_count,
+                how="inner",
+            )
+            .drop(columns=self.to_count)
+            .mean()
+        )
+        summary_str = ""
+        for col in patient_characteristics.index:
+            summary_str += f"{col}: {patient_characteristics[col]:.2f}\n"
+        return summary_str
 
     def save(
         self,

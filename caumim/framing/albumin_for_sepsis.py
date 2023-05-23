@@ -118,8 +118,8 @@ def get_population(cohort_config) -> Tuple[pd.DataFrame, Dict[str, List[str]]]:
         int(24 * cohort_config.treatment_observation_window_unit_day)
     )
     inclusion_criteria = {
-        "base_population": base_population,
-        "sepsis3": sepsis3_stays,
+        f"Aged over 18, ICU lOS >= {cohort_config.min_los_icu_unit_day}": base_population,
+        "Sepsis patients": sepsis3_stays,
         f"inclusion_event": crystralloids_first_24h,
     }
     # Run successively the inclusion criteria
@@ -241,7 +241,11 @@ def get_population(cohort_config) -> Tuple[pd.DataFrame, Dict[str, List[str]]]:
         )
 
     # create inclusion criteria dictionnary
-    inclusion_ids[f"albumin_first_{observation_window_in_hour_str}h"] = (
+    inclusion_ids[
+        f"Crystalloids in first {observation_window_in_hour_str}h"
+    ] = inclusion_ids[f"inclusion_event"]
+    inclusion_ids.pop("inclusion_event")
+    inclusion_ids[f"Albumin in first {observation_window_in_hour_str}h"] = (
         target_trial_population.loc[
             target_trial_population[COLNAME_INTERVENTION_STATUS] == 1,
             COLNAME_PATIENT_ID,
@@ -249,10 +253,6 @@ def get_population(cohort_config) -> Tuple[pd.DataFrame, Dict[str, List[str]]]:
         .unique()
         .tolist()
     )
-    inclusion_ids[
-        f"crystalloids_first_{observation_window_in_hour_str}h"
-    ] = inclusion_ids[f"inclusion_event"]
-    inclusion_ids.pop("inclusion_event")
     pickle.dump(
         inclusion_ids,
         open(str(cohort_folder / FILENAME_INCLUSION_CRITERIA), "wb"),

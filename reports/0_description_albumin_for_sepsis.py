@@ -2,6 +2,7 @@
 # %load_ext autoreload
 # %autoreload 2
 import pickle
+import numpy as np
 import pandas as pd
 import polars as pl
 from sklearn.preprocessing import OneHotEncoder
@@ -10,8 +11,8 @@ from tableone import TableOne
 from caumim.constants import *
 from caumim.description.utils import COMMON_DELTAS, add_delta, describe_delta
 from caumim.framing.albumin_for_sepsis import COHORT_CONFIG_ALBUMIN_FOR_SEPSIS
-from caumim.framing.utils import create_cohort_folder
-from caumim.utils import to_polars
+from caumim.framing.utils import create_cohort_folder, get_base_population
+from caumim.utils import to_pandas, to_polars
 from caumim.variables.aggregation import aggregate_medically_sepsis_albumin
 from caumim.variables.selection import (
     get_antibiotics_event_from_atc4,
@@ -67,31 +68,46 @@ inclusion_ids = pickle.load(
 )
 # %%
 flowchart_name = "flowchart_albumin_for_sepsis"
-f = Flowchart()
-last_criteria = inclusion_ids["Initial"]
-for criterion_name in inclusion_ids.keys():
-    intersection_with_previous = set(last_criteria).intersection(
-        set(inclusion_ids[criterion_name])
-    )
-    last_criteria = intersection_with_previous
-    print(f"{criterion_name}: {len(intersection_with_previous)} patients")
-
+# get back the full population caracteristics
+full_population = to_pandas(
+    feature_emergency_at_admission(get_base_population(0, 0, 0))
+)
+discriminative_features = full_population[
+    [COLNAME_PATIENT_ID, "Female", "White", "admission_age"]
+].rename(
+    columns={
+        "admission_age": "Age at admission",
+        COLNAME_PATIENT_ID: "person_id",
+    }
+)
 F = Flowchart(
     data=inclusion_ids,
     initial_description="Initial population",
+    cohort_characteristics=discriminative_features,
 )
+# %%
+treatment_criteria_name = "Albumin in first 24h"
 for criterion_name in inclusion_ids.keys():
-    if criterion_name != "initial":
+    if criterion_name not in ["initial", treatment_criteria_name]:
         F.add_criterion(
             criterion_name=criterion_name, description=criterion_name
         )
+F.add_final_split(
+    criterion_name=treatment_criteria_name,
+    left_description=treatment_criteria_name,
+    right_description="Crystalloids only",
+    left_title="Treated",
+    right_title="Control",
+)
 F.generate_flowchart(alternate=True)
-F.save(DIR2DOCS_COHORT / (flowchart_name + ".png"))
-F.save(DIR2DOCS_COHORT / (flowchart_name + ".svg"))
+
+saving_path = DIR2DOCS_IMG / albumin_cohort_folder.name
+saving_path.mkdir(exist_ok=True)
+
+F.save(saving_path / (flowchart_name + ".png"))
+F.save(saving_path / (flowchart_name + ".svg"))
 # %% [markdown]
 # # Table 1
-# %%
-
 # %%
 # Adding time deltas
 target_trial_population.head()
@@ -105,7 +121,6 @@ deltas["IR"] = deltas["75%"] - deltas["25%"]
 print(deltas[["count", "50%", "IR"]])
 
 # %%
-# Variable selection
 # Get baseline events
 inclusion_criteria_full_stay = pd.read_parquet(
     albumin_cohort_folder / FILENAME_TARGET_POPULATION
@@ -113,7 +128,7 @@ inclusion_criteria_full_stay = pd.read_parquet(
 # Change the inclusion criteria to be the full stay / or the first 24 hours
 # instead of only up to the intervention.
 acceptable_followup_windows = ["full_icu_stay", "24h", "up_to_intervention"]
-followup_window = "24h"
+followup_window = "up_to_intervention"
 
 if followup_window == "full_icu_stay":
     inclusion_criteria_full_stay[
@@ -175,7 +190,6 @@ aggregated_events = aggregated_events.with_columns(
         "urineoutput"
     )
 )
-# %%
 # Join with static features:
 baseline_statics = [
     "admission_age",
@@ -201,8 +215,6 @@ patient_full_features = aggregated_events.join(
     how="inner",
 ).to_pandas()
 
-
-# %%
 # save the features
 patient_matrix = patient_full_features[
     [
@@ -262,7 +274,6 @@ mytable = TableOne(
     # limit=limit_binary,
     groupby=COLNAME_INTERVENTION_STATUS,
 )
-cohort_name = albumin_cohort_folder.name
 
 # dirty fix to keep only class one for  binary features
 table_1_ = mytable.tableone.reset_index()
@@ -277,6 +288,6 @@ table_1_.rename(
 table_1_.set_index("", inplace=True)
 mytable.tableone = table_1_
 mytable.to_latex = mytable.tableone.to_latex
-mytable.to_latex(DIR2DOCS_IMG / cohort_name / f"table1_{followup_window}.tex")
+mytable.to_latex(saving_path / f"table1_{followup_window}.tex")
 mytable.tableone
 # %%

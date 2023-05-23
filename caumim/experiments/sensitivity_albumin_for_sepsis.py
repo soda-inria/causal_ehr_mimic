@@ -33,7 +33,7 @@ from zepid import RiskDifference
 sensitivity_config = Bunch(
     **{
         "expe_name": None,
-        "cohort_folder": DIR2COHORT / "albumin_for_sepsis",
+        "cohort_folder": DIR2COHORT / "albumin_for_sepsis__obs_1d",
         "outcome_name": COLNAME_MORTALITY_28D,
         "experience_grid_dict": {
             "event_aggregations": [

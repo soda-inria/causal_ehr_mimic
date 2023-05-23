@@ -66,16 +66,29 @@ def get_base_population(
         .sort(["subject_id", "icu_intime"])
         .groupby("subject_id")
         .first()
+    ).with_columns(
+        [
+            pl.when(pl.col("gender") == "F")
+            .then(pl.lit(1))
+            .otherwise(pl.lit(0))
+            .alias("Female"),
+            pl.when(pl.col("race").str.to_lowercase().str.contains("white"))
+            .then(pl.lit(1))
+            .otherwise(pl.lit(0))
+            .alias("White"),
+        ]
     )
 
     mask_icu_los_gt_24 = pl.col("los_icu") >= min_los_icu_unit_day
     mask_alive_at_24hours = (
-        first_icu_stay_over18["dod"] - first_icu_stay_over18["icu_intime"]
-    ).dt.hours() >= (min_icu_survival_unit_day / 24)
+        (
+            first_icu_stay_over18["dod"] - first_icu_stay_over18["icu_intime"]
+        ).dt.hours()
+        >= (min_icu_survival_unit_day / 24)
+    ) | (first_icu_stay_over18["dod"].is_null())
     base_population = first_icu_stay_over18.filter(
         mask_icu_los_gt_24 & mask_alive_at_24hours
     )
-
     return to_pandas(base_population)
 
 
