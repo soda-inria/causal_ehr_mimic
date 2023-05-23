@@ -190,7 +190,7 @@ test-docs:
 
 .PHONY: cp-img
 cp-img:
-	cp -r docs/source/_static/img ~/projets/inria/papiers/causal_inference_tuto/img/caumim
+	cp -r docs/source/_static/img/* ~/projets/inria/papiers/causal_inference_tuto/img/caumim
 
 .DEFAULT_GOAL := help
 

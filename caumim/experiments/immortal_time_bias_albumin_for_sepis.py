@@ -27,9 +27,9 @@ immortal_time_bias_config = Bunch(
 )
 
 cohort_names = [
-    # "albumin_for_sepsis__obs_0f25d",
-    "albumin_for_sepsis__obs_1d",
-    "albumin_for_sepsis__obs_3d",
+    "albumin_for_sepsis__obs_0f25d",
+    # "albumin_for_sepsis__obs_1d",
+    # "albumin_for_sepsis__obs_3d",
 ]
 
 if __name__ == "__main__":

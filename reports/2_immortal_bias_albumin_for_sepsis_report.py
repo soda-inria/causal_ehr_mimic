@@ -27,7 +27,7 @@ results["observation_period"] = results["cohort_name"].map(
 )
 results["label"] = (
     "Agg="
-    + results["event_aggregation"].map(
+    + results["event_aggregations"].map(
         lambda x: x.split(".")[-1].replace("()", "")
     )
     + ",\n  Est="
@@ -48,12 +48,12 @@ results["estimation_method"] = results["estimation_method"].map(
     else x
 )
 results["sortby"] = (
-    results["treatment_model"] + "_" + results["event_aggregation"]
+    results["treatment_model"] + "_" + results["event_aggregations"]
 )
 
 print(
     results.groupby(["estimation_method", "treatment_model", "cohort_name"])[
-        "event_aggregation"
+        "event_aggregations"
     ].count()
 )
 # %%
@@ -74,4 +74,5 @@ fp.forestplot(
 path2img = DIR2DOCS_IMG / expe_name
 path2img.mkdir(exist_ok=True, parents=True)
 plt.savefig(path2img / f"{expe_name}.pdf", bbox_inches="tight")
+plt.savefig(path2img / f"{expe_name}.png", bbox_inches="tight")
 # %%

@@ -37,22 +37,22 @@ sensitivity_config = Bunch(
         "outcome_name": COLNAME_MORTALITY_28D,
         "experience_grid_dict": {
             "event_aggregations": [
-                {
-                    "first": pl.col(COLNAME_VALUE).first(),
-                    "last": pl.col(COLNAME_VALUE).last(),
-                },
+                # {
+                #     "first": pl.col(COLNAME_VALUE).first(),
+                #     "last": pl.col(COLNAME_VALUE).last(),
+                # },
                 {"first": pl.col(COLNAME_VALUE).first()},
-                {"last": pl.col(COLNAME_VALUE).last()},
+                # {"last": pl.col(COLNAME_VALUE).last()},
             ],
             "estimation_method": [
-                "backdoor.propensity_score_matching",
-                "backdoor.propensity_score_weighting",
-                "LinearDML",
+                # "backdoor.propensity_score_matching",
+                # "backdoor.propensity_score_weighting",
+                # "LinearDML",
                 "TLearner",
-                "LinearDRLearner",
-                "CausalForest",
+                # "LinearDRLearner",
+                # "CausalForest",
             ],
-            "estimator": [ESTIMATOR_RIDGE, ESTIMATOR_RF],
+            "estimator": [ESTIMATOR_RIDGE],  # ESTIMATOR_RF,
         },
         "fraction": 1,
         "random_state": 0,
