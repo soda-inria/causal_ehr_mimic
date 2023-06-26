@@ -57,7 +57,7 @@ print(
     ].count()
 )
 # %%
-fp.forestplot(
+axes = fp.forestplot(
     results,  # the dataframe with results data
     estimate=RESULT_ATE,  # col containing estimated effect size
     ll=RESULT_ATE_LB,
@@ -71,6 +71,20 @@ fp.forestplot(
     color_alt_rows=True,
     # sortby="sortby",
 )
+# Add vertical line for gold standard
+# Choosing Caironi 2014 since the ATE is available and it is the most recent RCT.
+axes.axvline(
+    VALUE_RCT_GOLD_STANDARD_ATE, linestyle="--", color="salmon", linewidth=2
+)
+axes.text(
+    VALUE_RCT_GOLD_STANDARD_ATE,
+    1,
+    LABEL_RCT_GOLD_STANDARD_ATE,
+    transform=axes.get_xaxis_transform(),
+    fontsize=12,
+    color="salmon",
+)
+
 path2img = DIR2DOCS_IMG / expe_name
 path2img.mkdir(exist_ok=True, parents=True)
 plt.savefig(path2img / f"{expe_name}.pdf", bbox_inches="tight")

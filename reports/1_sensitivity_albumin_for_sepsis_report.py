@@ -9,19 +9,23 @@ from caumim.constants import *
 from caumim.framing.albumin_for_sepsis import COHORT_CONFIG_ALBUMIN_FOR_SEPSIS
 from caumim.framing.utils import create_cohort_folder
 
+IS_MAIN_FIGURE = False
 # %%
 cohort_dir = create_cohort_folder(COHORT_CONFIG_ALBUMIN_FOR_SEPSIS)
 cohort_name = cohort_dir.name
 expe_name = "estimates_20230523__est_lr_rf"  #
 # expe_name = "estimates_20230516203739"
 ### For IP matching, interesting results with RF which seems to overfit the data and results are dependents on the aggregation strategy.
-results = pd.read_parquet(DIR2EXPERIENCES / cohort_name / expe_name)
-mask_matching = (
-    results["estimation_method"] == "backdoor.propensity_score_matching"
-)
-# mask the first aggregation which does not affect the results
-mask_last_agg = results["event_aggregations"] == "['last']"
-results = results.loc[~mask_last_agg]
+raw_results = pd.read_parquet(DIR2EXPERIENCES / cohort_name / expe_name)
+
+if IS_MAIN_FIGURE:
+    # mask the first aggregation which does not affect the results
+    mask_forest = raw_results["estimation_method"] == "CausalForest"
+    mask_last_agg = raw_results["event_aggregations"] == "['last']"
+    # mask causal forests
+    results = raw_results[~mask_last_agg & ~mask_forest]
+else:
+    results = raw_results
 outcome_name = COLNAME_MORTALITY_28D
 
 results["label"] = (
@@ -56,7 +60,7 @@ print(
 # %%
 import forestplot as fp
 
-fp.forestplot(
+axes = fp.forestplot(
     results,  # the dataframe with resultcodes data
     estimate=RESULT_ATE,  # col containing estimated effect size
     ll=RESULT_ATE_LB,
@@ -75,8 +79,22 @@ fp.forestplot(
     color_alt_rows=True,
     sortby="sortby",
 )
+axes.axvline(
+    VALUE_RCT_GOLD_STANDARD_ATE, linestyle="--", color="salmon", linewidth=2
+)
+axes.text(
+    VALUE_RCT_GOLD_STANDARD_ATE,
+    1,
+    LABEL_RCT_GOLD_STANDARD_ATE,
+    transform=axes.get_xaxis_transform(),
+    fontsize=12,
+    color="salmon",
+)
+
 path2img = DIR2DOCS_IMG / cohort_name
 path2img.mkdir(exist_ok=True, parents=True)
+if not IS_MAIN_FIGURE:
+    expe_name = expe_name + "_supplementary"
 plt.savefig(path2img / f"{expe_name}.pdf", bbox_inches="tight")
 plt.savefig(path2img / f"{expe_name}.png", bbox_inches="tight")
 # %%

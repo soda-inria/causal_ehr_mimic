@@ -16,6 +16,7 @@ from caumim.constants import (
     RESULT_ATE,
     RESULT_ATE_LB,
     RESULT_ATE_UB,
+    MIN_PS_SCORE,
 )
 
 from econml.dr import LinearDRLearner
@@ -131,7 +132,7 @@ class InferenceWrapper(BaseEstimator):
                 dr_learner = LinearDRLearner(
                     model_propensity=self.treatment_pipeline["estimator"],
                     model_regression=self.outcome_pipeline["estimator"],
-                    min_propensity=0.001,
+                    min_propensity=MIN_PS_SCORE,
                     cv=5,
                     random_state=RANDOM_STATE,
                 )
@@ -251,8 +252,8 @@ def _fit_dowhy(
         method_name=estimation_method,
         method_params={
             "propensity_score_model": treatment_pipeline[-1],
-            "min_ps_score": 0.001,
-            "max_ps_score": 0.999,
+            "min_ps_score": MIN_PS_SCORE,
+            "max_ps_score": 1 - MIN_PS_SCORE,
         },
         confidence_intervals=True,
     )

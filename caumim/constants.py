@@ -85,6 +85,10 @@ RESULT_ATE = "ATE"
 RESULT_ATE_LB = "ATE lower bound"
 RESULT_ATE_UB = "ATE upper bound"
 
+# experiment constants
+RANDOM_STATE = 42
+MIN_PS_SCORE = 0.001
+
 # report constants
 
 IDENTIFICATION2LABELS = {
@@ -100,4 +104,8 @@ OUTCOME2LABELS = {
     COLNAME_MORTALITY_28D: "28-day mortality",
     COLNAME_MORTALITY_90D: "90-day mortality",
 }
-RANDOM_STATE = 42
+
+# Caironi et al. 2014, effect size (ATE)
+
+LABEL_RCT_GOLD_STANDARD_ATE = "RCT Gold Standard \n (Caironi et al. 2014)"
+VALUE_RCT_GOLD_STANDARD_ATE = 0

@@ -258,7 +258,10 @@ def run_sensitivity_experiment(config):
         )
         inference_wrapper.fit(X_a, y)
         results = inference_wrapper.predict(X=X_a)
+        # evaluate the statistical assumptions:
+        # - overlap
 
+        # - well-specified models
         results["event_aggregations"] = str(aggregation_names)
         results["estimation_method"] = run_config["estimation_method"]
         results["treatment_model"] = estimator_name

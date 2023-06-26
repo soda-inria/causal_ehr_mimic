@@ -139,7 +139,9 @@ class Criterion:
 
         lines = txt.split("\n")
         bboxes = [
-            matplotlib.textpath.TextPath((100, 100), txt, prop=fp).get_extents()
+            matplotlib.textpath.TextPath(
+                (100, 100), txt, prop=fp
+            ).get_extents()
             for txt in lines
         ]
 
@@ -166,7 +168,9 @@ class Criterion:
         fontsize = kwargs.get("fontsize", 10)
 
         bbox_1 = self.get_bbox(fontsize=fontsize)
-        bbox_2 = self.get_bbox(txt=self.excluded_description, fontsize=fontsize)
+        bbox_2 = self.get_bbox(
+            txt=self.excluded_description, fontsize=fontsize
+        )
 
         if not final_split:
             condition = flow.Decision(w=0, h=0)
@@ -175,7 +179,9 @@ class Criterion:
             d += getattr(flow.Arrow(), direction)(arrow_length).at(condition.E)
 
             d += (
-                flow.Box(**bbox_2).label(self.excluded_description).linewidth(1)
+                flow.Box(**bbox_2)
+                .label(self.excluded_description)
+                .linewidth(1)
             )
             d += flow.Arrow().at(condition.S).down(1 / 2)
             d += flow.Box(**bbox_1).label(self.full_description)
@@ -478,7 +484,9 @@ class Flowchart:
         d.config(font="dejavu sans", fontsize=fontsize, unit=1)
 
         start_description = (
-            self.initial_description + "\n" + f"({self.criteria[0].input_data})"
+            self.initial_description
+            + "\n"
+            + f"({self.criteria[0].input_data})"
         )
         start_bbox = Criterion.get_bbox(None, txt=start_description)
 
