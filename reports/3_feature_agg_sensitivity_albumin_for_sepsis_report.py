@@ -41,6 +41,7 @@ print(
         "event_aggregations"
     ].count()
 )
+results["ntv"] = results["ntv"].map(lambda x: f"{x:.2f}" if x > 0 else "")
 
 # %%
 import forestplot as fp
@@ -61,7 +62,7 @@ fp.forestplot(
         if id_label in results["estimation_method"].unique()
     ],
     rightannote=["ntv"],  # columns to report on right of plot
-    right_annoteheaders=["Overlap measure as Normalized Total Variation"],
+    right_annoteheaders=["Overlap \n (Normalized \n Total Variation)"],
     figsize=(5, 12),
     color_alt_rows=True,
     sortby="sortby",
@@ -69,4 +70,6 @@ fp.forestplot(
 path2img = DIR2DOCS_IMG / cohort_name
 path2img.mkdir(exist_ok=True, parents=True)
 plt.savefig(path2img / f"{cohort_name}.pdf", bbox_inches="tight")
+plt.savefig(path2img / f"{cohort_name}.png", bbox_inches="tight")
+
 # %%

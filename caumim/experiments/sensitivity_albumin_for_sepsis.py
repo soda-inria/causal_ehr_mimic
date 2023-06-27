@@ -138,6 +138,7 @@ def run_sensitivity_experiment(config):
         RESULT_ATE: dm.results.RiskDifference[1],
         RESULT_ATE_LB: dm.results.RiskDifference[1],
         RESULT_ATE_UB: dm.results.RiskDifference[1],
+        "ntv": -1,
         "event_aggregations": str(None),
         "estimation_method": "Difference in mean",
         "treatment_model": str(None),
@@ -310,7 +311,6 @@ def run_sensitivity_experiment(config):
         # TODO: log the scores of the estimators
         # (after refitting through the inference wrapper: need to get them back)
         results["ntv"] = ntv
-        breakpoint()
         results["event_aggregations"] = str(aggregation_names)
         results["estimation_method"] = run_config["estimation_method"]
         results["treatment_model"] = estimator_name
@@ -318,6 +318,7 @@ def run_sensitivity_experiment(config):
         results["compute_time"] = (datetime.now() - t0).total_seconds()
         results["cohort_name"] = cohort_folder.name
         results["outcome_name"] = outcome_name
+        breakpoint()
         log_estimate(results, log_folder)
 
 
