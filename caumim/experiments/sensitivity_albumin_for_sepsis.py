@@ -1,10 +1,14 @@
 from copy import deepcopy
 from datetime import datetime
 from loguru import logger
+from matplotlib import pyplot as plt
+import seaborn as sns
+
 import polars as pl
 import pandas as pd
 import numpy as np
 from sklearn import clone
+from sklearn.calibration import cross_val_predict
 from sklearn.model_selection import ParameterGrid, RandomizedSearchCV
 from sklearn.utils import Bunch
 from caumim.constants import *
@@ -16,6 +20,7 @@ from caumim.experiments.utils import (
     fit_randomized_search,
     make_column_transformer,
 )
+from caumim.inference.scores import normalized_total_variation
 from caumim.inference.utils import make_random_search_pipeline
 
 from caumim.variables.selection import get_event_covariates_albumin_zhou
@@ -249,6 +254,7 @@ def run_sensitivity_experiment(config):
         )
         X_a = pd.concat([X_transformed, a], axis=1)
         # 4 - Estimation
+        ## If the causal model is not a doubly robust, wrap the treatment or outcome models into a
         inference_wrapper = InferenceWrapper(
             treatment_pipeline=treatment_best_pipeline,
             outcome_pipeline=outcome_best_pipeline,
@@ -258,10 +264,53 @@ def run_sensitivity_experiment(config):
         )
         inference_wrapper.fit(X_a, y)
         results = inference_wrapper.predict(X=X_a)
-        # evaluate the statistical assumptions:
-        # - overlap
+        # Evaluate the statistical assumptions:
+        ### Overlap
+        hat_e = cross_val_predict(
+            estimator=treatment_best_pipeline,
+            X=X.drop(
+                columns=[COLNAME_INTERVENTION_STATUS, outcome_name],
+                errors="ignore",
+            ),
+            y=a,
+            n_jobs=-1,
+            method="predict_proba",
+        )[:, 1]
+        #### With NTV (low dimensional score)
+        ntv = normalized_total_variation(hat_e, a.mean())
+        #### Save estimated ps distributions (graphically)
+        hat_analysis_df = pd.DataFrame(
+            np.vstack([hat_e, a.values]).T,
+            columns=[LABEL_PS, LABEL_TREATMENT],
+        )
+        hat_analysis_df[LABEL_TREATMENT] = hat_analysis_df.apply(
+            lambda x: TREATMENT_LABELS[int(x[LABEL_TREATMENT])], axis=1
+        )
+        fix, ax = plt.subplots(figsize=(8, 5))
+        sns.histplot(
+            ax=ax,
+            data=hat_analysis_df,
+            x=LABEL_PS,
+            hue=LABEL_TREATMENT,
+            stat="probability",
+            common_norm=False,
+            palette=TREATMENT_PALETTE,
+        )
+        ps_plot_name = (
+            f"ps_distribution__{str(aggregation_names)}__{estimator_name}"
+        )
+        ps_folder = log_folder / "ps_distributions"
+        ps_folder.mkdir(exist_ok=True)
+        plt.savefig(ps_folder / f"{ps_plot_name}.pdf", bbox_inches="tight")
+        plt.savefig(ps_folder / f"{ps_plot_name}.png", bbox_inches="tight")
 
-        # - well-specified models
+        #### With [standardized difference](https://onlinelibrary.wiley.com/doi/full/10.1002/sim.6607) TODO:
+
+        ### Well-specified models
+        # TODO: log the scores of the estimators
+        # (after refitting through the inference wrapper: need to get them back)
+        results["ntv"] = ntv
+        breakpoint()
         results["event_aggregations"] = str(aggregation_names)
         results["estimation_method"] = run_config["estimation_method"]
         results["treatment_model"] = estimator_name

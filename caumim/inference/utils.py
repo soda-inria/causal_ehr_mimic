@@ -26,7 +26,7 @@ def make_random_search_pipeline(
         ("preprocessor", column_transformer),
         ("estimator", estimator),
     ]
-    # better to optimize for brier score if this is aclass
+    # better to optimize for brier score if we target a binary treatment
     if is_classifier(estimator):
         scoring_ = "neg_brier_score"
     else:

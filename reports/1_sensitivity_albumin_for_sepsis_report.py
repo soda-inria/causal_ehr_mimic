@@ -14,6 +14,7 @@ IS_MAIN_FIGURE = False
 cohort_dir = create_cohort_folder(COHORT_CONFIG_ALBUMIN_FOR_SEPSIS)
 cohort_name = cohort_dir.name
 expe_name = "estimates_20230523__est_lr_rf"  #
+# expe_name = "sensitivity_feature_aggregation_albumin_for_sepsis"
 # expe_name = "estimates_20230516203739"
 ### For IP matching, interesting results with RF which seems to overfit the data and results are dependents on the aggregation strategy.
 raw_results = pd.read_parquet(DIR2EXPERIENCES / cohort_name / expe_name)
@@ -60,6 +61,7 @@ print(
 # %%
 import forestplot as fp
 
+# TODO: add the NTV on the forest plot.
 axes = fp.forestplot(
     results,  # the dataframe with resultcodes data
     estimate=RESULT_ATE,  # col containing estimated effect size
@@ -75,6 +77,8 @@ axes = fp.forestplot(
         for ident_ in list(IDENTIFICATION2LABELS.values())
         if ident_ in results["estimation_method"].unique()
     ],
+    # rightannote=["ntv"],  # columns to report on right of plot
+    # right_annoteheaders=["Overlap measure as Normalized Total Variation"],
     figsize=(5, 12),
     color_alt_rows=True,
     sortby="sortby",

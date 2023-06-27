@@ -2,6 +2,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict
 from dowhy import CausalModel
+from dowhy.causal_estimator import CausalEstimate
 
 import pandas as pd
 from sklearn.base import BaseEstimator
@@ -260,7 +261,7 @@ def _fit_dowhy(
     return estimate
 
 
-def _predict_dowhy(X, estimator):
+def _predict_dowhy(X, estimator: CausalEstimate):
     lower_bound, upper_bound = estimator.get_confidence_intervals()
     results = {}
     results[RESULT_ATE] = estimator.value

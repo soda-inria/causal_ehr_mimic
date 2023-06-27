@@ -1,7 +1,11 @@
 # %%
+from matplotlib import pyplot as plt
 import polars as pl
 import pandas as pd
 import numpy as np
+import seaborn as sns
+
+from sklearn.calibration import cross_val_predict
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 from caumim.constants import *
 from caumim.experiments.utils import make_column_transformer
@@ -71,6 +75,7 @@ aggregate_functions = {
     "last": pl.col(COLNAME_VALUE).last(),
 }
 aggregate_functions = {k: v.alias(k) for k, v in aggregate_functions.items()}
+aggregation_names = list(aggregate_functions.keys())
 patient_features_aggregated = (
     event_features.sort([COLNAME_PATIENT_ID, COLNAME_START])
     .groupby(STAY_KEYS + [COLNAME_CODE])
@@ -78,7 +83,7 @@ patient_features_aggregated = (
 ).pivot(
     index=STAY_KEYS,
     columns=COLNAME_CODE,
-    values=list(aggregate_functions.keys()),
+    values=list(aggregation_names),
 )
 event_features_names = list(
     set(patient_features_aggregated.columns).difference(set(STAY_KEYS))
@@ -95,13 +100,27 @@ X_list = patient_features_aggregated.join(
         outcome_name,
     ]
 ].to_pandas()
-
-X_list[feature_types.binary_features] = X_list[
-    feature_types.binary_features
-].fillna(value=0)
+colnames_binary_features = [
+    f"{agg_name_}_code_{col}"
+    for agg_name_ in aggregation_names
+    for col in feature_types.binary_features
+]
+colnames_numerical_features = [
+    f"{agg_name_}_code_{col}"
+    for agg_name_ in aggregation_names
+    for col in feature_types.numerical_features
+]
+colnames_categorical_features = [
+    f"{agg_name_}_code_{col}"
+    for agg_name_ in aggregation_names
+    for col in feature_types.categorical_features
+]
+X_list[colnames_binary_features] = X_list[colnames_binary_features].fillna(
+    value=0
+)
 column_transformer = make_column_transformer(
-    numerical_features=feature_types.numerical_features,
-    categorical_features=feature_types.categorical_features,
+    numerical_features=colnames_numerical_features,
+    categorical_features=colnames_categorical_features,
 )
 # preview the feature preprocessing (imputation, categories handling and standardization)
 column_transformer_preview = clone(column_transformer)
@@ -123,7 +142,7 @@ transformed_features_preview.head()
 # %%
 from caumim.experiments.configurations import ESTIMATOR_RIDGE, ESTIMATOR_RF
 
-estimator = ESTIMATOR_RF
+estimator = ESTIMATOR_RIDGE
 # %% [markdown] Because, there is some hyper-parameters to choose, we will use a
 # random search to find the best hyper-parameters for our dataset, as
 # recommended by [Bouthillier et al., 2021](https://arxiv.org/pdf/2103.03098.pdf). Then, for the
@@ -308,3 +327,37 @@ dm_results = {
     RESULT_ATE_UB: dm.results.UpperBound[1],
 }
 dm_results
+
+# %% [markdown]
+# Check assumptions
+
+## Graphical assessment
+# %%
+hat_e = cross_val_predict(
+    estimator=treatment_estimator_w_best_HP,
+    X=X_list,
+    y=a,
+    n_jobs=-1,
+    method="predict_proba",
+)[:, 1]
+hat_analysis_df = pd.DataFrame(
+    np.vstack([hat_e, a.values]).T,
+    columns=[LABEL_PS, LABEL_TREATMENT],
+)
+hat_analysis_df[LABEL_TREATMENT] = hat_analysis_df.apply(
+    lambda x: TREATMENT_LABELS[int(x[LABEL_TREATMENT])], axis=1
+)
+
+# %%
+fix, ax = plt.subplots(figsize=(8, 5))
+sns.histplot(
+    ax=ax,
+    data=hat_analysis_df,
+    x=LABEL_PS,
+    hue=LABEL_TREATMENT,
+    stat="probability",
+    common_norm=False,
+    palette=TREATMENT_PALETTE,
+)
+
+# %%

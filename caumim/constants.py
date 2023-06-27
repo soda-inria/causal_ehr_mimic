@@ -104,6 +104,13 @@ OUTCOME2LABELS = {
     COLNAME_MORTALITY_28D: "28-day mortality",
     COLNAME_MORTALITY_90D: "90-day mortality",
 }
+LABEL_PS = "Estimated propensity score"
+LABEL_TREATMENT = "Treatment status"
+TREATMENT_LABELS = {0: "Control", 1: "Intervention"}
+TREATMENT_PALETTE = {
+    "Control": "#ff7f0e",
+    "Intervention": "#1f77b4",
+}
 
 # Caironi et al. 2014, effect size (ATE)
 
