@@ -91,15 +91,6 @@ MIN_PS_SCORE = 0.001
 
 # report constants
 
-IDENTIFICATION2LABELS = {
-    "Difference in mean": "Unajusted risk difference",
-    "backdoor.propensity_score_matching": "Propensity Score Matching",
-    "backdoor.propensity_score_weighting": "Inverse Propensity Weighting",
-    "TLearner": "Outcome model (TLearner)",
-    "CausalForest": "Causal Forest",
-    "LinearDML": "Double Machine Learning",
-    "LinearDRLearner": "Doubly Robust (AIPW)",
-}
 OUTCOME2LABELS = {
     COLNAME_MORTALITY_28D: "28-day mortality",
     COLNAME_MORTALITY_90D: "90-day mortality",
@@ -114,5 +105,21 @@ TREATMENT_PALETTE = {
 
 # Caironi et al. 2014, effect size (ATE)
 
-LABEL_RCT_GOLD_STANDARD_ATE = "RCT Gold Standard \n (Caironi et al. 2014)"
+LABEL_RCT_GOLD_STANDARD_ATE = "RCT Gold Standard (Caironi et al. 2014)"
+# Computation of the confidence interval for risk difference is done with pooled variance
+
 VALUE_RCT_GOLD_STANDARD_ATE = 0
+VALUE_RCT_GOLD_STANDARD_ATE_LB = VALUE_RCT_GOLD_STANDARD_ATE
+VALUE_RCT_GOLD_STANDARD_ATE_UB = VALUE_RCT_GOLD_STANDARD_ATE
+
+
+IDENTIFICATION2LABELS = {
+    "Difference in mean": "Unajusted risk difference",
+    LABEL_RCT_GOLD_STANDARD_ATE: LABEL_RCT_GOLD_STANDARD_ATE,
+    "backdoor.propensity_score_matching": "Propensity Score Matching",
+    "backdoor.propensity_score_weighting": "Inverse Propensity Weighting",
+    "TLearner": "Outcome model (TLearner)",
+    "CausalForest": "Causal Forest",
+    "LinearDML": "Double Machine Learning",
+    "LinearDRLearner": "Doubly Robust (AIPW)",
+}

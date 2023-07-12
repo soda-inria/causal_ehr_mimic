@@ -42,25 +42,26 @@ sensitivity_config = Bunch(
         "outcome_name": COLNAME_MORTALITY_28D,
         "experience_grid_dict": {
             "event_aggregations": [
-                # {
-                #     "first": pl.col(COLNAME_VALUE).first(),
-                #     "last": pl.col(COLNAME_VALUE).last(),
-                # },
+                {
+                    "first": pl.col(COLNAME_VALUE).first(),
+                    "last": pl.col(COLNAME_VALUE).last(),
+                },
                 {"first": pl.col(COLNAME_VALUE).first()},
                 # {"last": pl.col(COLNAME_VALUE).last()},
             ],
             "estimation_method": [
-                # "backdoor.propensity_score_matching",
-                # "backdoor.propensity_score_weighting",
-                # "LinearDML",
+                "LinearDML",
+                "backdoor.propensity_score_matching",
+                "backdoor.propensity_score_weighting",
                 "TLearner",
-                # "LinearDRLearner",
+                "LinearDRLearner",
                 # "CausalForest",
             ],
-            "estimator": [ESTIMATOR_RIDGE],  # ESTIMATOR_RF,
+            "estimator": [ESTIMATOR_RIDGE],  # ESTIMATOR_RF
         },
         "fraction": 1,
         "random_state": 0,
+        "bootstrap_num_samples": 50,
     }
 )
 
@@ -71,13 +72,14 @@ def run_sensitivity_experiment(config):
         config["expe_name"] = None
     if config.expe_name is None:
         expe_name = datetime.now().strftime("%Y%m%d%H%M%S")
-        log_folder = (
+        dir_folder = (
             DIR2EXPERIENCES
             / cohort_folder.name
             / ("estimates" + f"_{expe_name}")
         )
     else:
-        log_folder = DIR2EXPERIENCES / config.expe_name
+        dir_folder = DIR2EXPERIENCES / config.expe_name
+    log_folder = dir_folder / "logs"
     # 1 - Framing
     target_trial_population = pl.read_parquet(
         cohort_folder / FILENAME_TARGET_POPULATION
@@ -138,7 +140,7 @@ def run_sensitivity_experiment(config):
         RESULT_ATE: dm.results.RiskDifference[1],
         RESULT_ATE_LB: dm.results.RiskDifference[1],
         RESULT_ATE_UB: dm.results.RiskDifference[1],
-        "ntv": -1,
+        "ntv": -1.0,
         "event_aggregations": str(None),
         "estimation_method": "Difference in mean",
         "treatment_model": str(None),
@@ -262,6 +264,7 @@ def run_sensitivity_experiment(config):
             estimation_method=run_config["estimation_method"],
             outcome_name=outcome_name,
             treatment_name=COLNAME_INTERVENTION_STATUS,
+            bootstrap_num_samples=config.bootstrap_num_samples,
         )
         inference_wrapper.fit(X_a, y)
         results = inference_wrapper.predict(X=X_a)
@@ -300,7 +303,7 @@ def run_sensitivity_experiment(config):
         ps_plot_name = (
             f"ps_distribution__{str(aggregation_names)}__{estimator_name}"
         )
-        ps_folder = log_folder / "ps_distributions"
+        ps_folder = dir_folder / "ps_distributions"
         ps_folder.mkdir(exist_ok=True)
         plt.savefig(ps_folder / f"{ps_plot_name}.pdf", bbox_inches="tight")
         plt.savefig(ps_folder / f"{ps_plot_name}.png", bbox_inches="tight")
@@ -318,7 +321,7 @@ def run_sensitivity_experiment(config):
         results["compute_time"] = (datetime.now() - t0).total_seconds()
         results["cohort_name"] = cohort_folder.name
         results["outcome_name"] = outcome_name
-        breakpoint()
+
         log_estimate(results, log_folder)
 
 

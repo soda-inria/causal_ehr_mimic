@@ -30,6 +30,7 @@ immortal_time_bias_config = Bunch(
         },
         "fraction": 1,
         "random_state": 0,
+        "bootstrap_num_samples": 50,
     }
 )
 

@@ -10,6 +10,11 @@ from caumim.framing.albumin_for_sepsis import COHORT_CONFIG_ALBUMIN_FOR_SEPSIS
 from caumim.framing.utils import create_cohort_folder
 import forestplot as fp
 
+from caumim.reports_utils import (
+    add_rct_gold_standard_line,
+    compute_gold_standard_ate_caironi,
+)
+
 COHORT_NAME2LABEL = {
     "albumin_for_sepsis__obs_0f25d": "6h",
     "albumin_for_sepsis__obs_1d": "24h",
@@ -17,14 +22,16 @@ COHORT_NAME2LABEL = {
 }
 
 # %%
-expe_name = "immortal_time_bias_double_robust_forest_agg_last"
-results = pd.read_parquet(DIR2EXPERIENCES / expe_name)
+expe_name = "immortal_time_bias_double_robust_forest_agg_last__bs_50"
+results = pd.read_parquet(DIR2EXPERIENCES / expe_name / "logs")
 # %%
 # Create nice labels for forest plot
 outcome_name = results["outcome_name"].unique()[0]
 results["observation_period"] = results["cohort_name"].map(
     lambda x: COHORT_NAME2LABEL[x] if x in COHORT_NAME2LABEL.keys() else x
 )
+# add rct gold standard
+results = add_rct_gold_standard_line(results)
 results["label"] = (
     "Agg="
     + results["event_aggregations"].map(
@@ -39,9 +46,11 @@ results["label"] = (
     + " + "
     + results["treatment_model"]
 )
-results.loc[
-    results["estimation_method"] == "Difference in mean", "label"
-] = IDENTIFICATION2LABELS["Difference in mean"]
+for k in ["Difference in mean", LABEL_RCT_GOLD_STANDARD_ATE]:
+    results.loc[
+        results["estimation_method"] == k, "label"
+    ] = IDENTIFICATION2LABELS[k]
+
 results["estimation_method"] = results["estimation_method"].map(
     lambda x: IDENTIFICATION2LABELS[x]
     if x in IDENTIFICATION2LABELS.keys()
@@ -71,19 +80,7 @@ axes = fp.forestplot(
     color_alt_rows=True,
     # sortby="sortby",
 )
-# Add vertical line for gold standard
-# Choosing Caironi 2014 since the ATE is available and it is the most recent RCT.
-axes.axvline(
-    VALUE_RCT_GOLD_STANDARD_ATE, linestyle="--", color="salmon", linewidth=2
-)
-axes.text(
-    VALUE_RCT_GOLD_STANDARD_ATE,
-    1,
-    LABEL_RCT_GOLD_STANDARD_ATE,
-    transform=axes.get_xaxis_transform(),
-    fontsize=12,
-    color="salmon",
-)
+axes.set(xlim=(-0.075, 0.075))
 
 path2img = DIR2DOCS_IMG / expe_name
 path2img.mkdir(exist_ok=True, parents=True)

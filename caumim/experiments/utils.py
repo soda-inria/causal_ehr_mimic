@@ -93,6 +93,8 @@ ECONML_META_LEARNERS = ["TLearner"]
 
 ECONML_LEARNERS = [*ECONML_CATE_LEARNERS, *ECONML_META_LEARNERS, "CausalForest"]
 
+DEFAULT_BS_NUM_SAMPLES = 100
+
 
 class InferenceWrapper(BaseEstimator):
     """
@@ -106,6 +108,7 @@ class InferenceWrapper(BaseEstimator):
         estimation_method: str,
         outcome_name: str,
         treatment_name: str,
+        bootstrap_num_samples: int = DEFAULT_BS_NUM_SAMPLES,
     ) -> None:
         super().__init__()
         self.treatment_pipeline = treatment_pipeline
@@ -116,6 +119,7 @@ class InferenceWrapper(BaseEstimator):
         self._not_supported_estimation_method = ValueError(
             f"{self.estimation_method} not supported."
         )
+        self.bootstrap_num_samples = bootstrap_num_samples
 
     def fit(self, X, y):
         if self.estimation_method.startswith("backdoor."):
@@ -142,7 +146,9 @@ class InferenceWrapper(BaseEstimator):
                     a,
                     X=None,
                     W=X_,
-                    inference=BootstrapInference(n_bootstrap_samples=10),
+                    inference=BootstrapInference(
+                        n_bootstrap_samples=self.bootstrap_num_samples
+                    ),
                 )
                 self.inference_estimator_ = dr_learner
             elif self.estimation_method == "TLearner":
@@ -157,7 +163,9 @@ class InferenceWrapper(BaseEstimator):
                     y,
                     a,
                     X=X_,
-                    inference=BootstrapInference(n_bootstrap_samples=10),
+                    inference=BootstrapInference(
+                        n_bootstrap_samples=self.bootstrap_num_samples
+                    ),
                 )
                 self.inference_estimator_ = t_learner
             elif self.estimation_method == "LinearDML":
@@ -173,7 +181,9 @@ class InferenceWrapper(BaseEstimator):
                     a,
                     X=None,
                     W=X_,
-                    inference=BootstrapInference(n_bootstrap_samples=10),
+                    inference=BootstrapInference(
+                        n_bootstrap_samples=self.bootstrap_num_samples
+                    ),
                 )
                 self.inference_estimator_ = dml_learner
             elif self.estimation_method == "CausalForest":
@@ -192,7 +202,11 @@ class InferenceWrapper(BaseEstimator):
 
     def predict(self, X):
         if self.estimation_method.startswith("backdoor."):
-            results = _predict_dowhy(X, estimator=self.inference_estimator_)
+            results = _predict_dowhy(
+                X,
+                estimator=self.inference_estimator_,
+                num_boostrap_samples=self.bootstrap_num_samples,
+            )
         elif self.estimation_method in ECONML_LEARNERS:
             X_, _ = _get_X_a(X, self.treatment_name)
             if self.estimation_method in ECONML_CATE_LEARNERS:
@@ -256,13 +270,17 @@ def _fit_dowhy(
             "min_ps_score": MIN_PS_SCORE,
             "max_ps_score": 1 - MIN_PS_SCORE,
         },
-        confidence_intervals=True,
+        confidence_intervals="bootstrap",
     )
     return estimate
 
 
-def _predict_dowhy(X, estimator: CausalEstimate):
-    lower_bound, upper_bound = estimator.get_confidence_intervals()
+def _predict_dowhy(
+    X, estimator: CausalEstimate, num_boostrap_samples: int = 100
+):
+    lower_bound, upper_bound = estimator.get_confidence_intervals(
+        num_simulations=num_boostrap_samples,
+    )
     results = {}
     results[RESULT_ATE] = estimator.value
     results[RESULT_ATE_LB] = lower_bound
