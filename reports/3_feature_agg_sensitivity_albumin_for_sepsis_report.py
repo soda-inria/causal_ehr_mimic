@@ -8,9 +8,9 @@ import matplotlib.pyplot as plt
 from caumim.constants import *
 
 # %%
-cohort_name = "sensitivity_feature_aggregation_albumin_for_sepsis"
+cohort_name = "sensitivity_feature_aggregation_albumin_for_sepsis__bs_50"
 ### For IP matching, interesting results with RF which seems to overfit the data and results are dependents on the aggregation strategy.
-results = pd.read_parquet(DIR2EXPERIENCES / cohort_name / "result_logs")
+results = pd.read_parquet(DIR2EXPERIENCES / cohort_name / "logs")
 outcome_name = COLNAME_MORTALITY_28D
 
 results["label"] = (
