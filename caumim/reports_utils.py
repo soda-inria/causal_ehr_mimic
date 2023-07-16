@@ -1,13 +1,20 @@
+from matplotlib import pyplot as plt
 import pandas as pd
 import numpy as np
 from caumim.constants import (
+    COLORMAP_HTE,
+    LABEL_MAPPING_HTE_BINARY_NAME,
+    LABEL_MAPPING_HTE_FEATURE_COL,
+    LABEL_NON_WHITE,
     LABEL_RCT_GOLD_STANDARD_ATE,
+    LABEL_WHITE,
     RESULT_ATE_LB,
     RESULT_ATE_UB,
     VALUE_RCT_GOLD_STANDARD_ATE,
     VALUE_RCT_GOLD_STANDARD_ATE_LB,
     VALUE_RCT_GOLD_STANDARD_ATE_UB,
 )
+import seaborn as sns
 
 
 def compute_gold_standard_ate_ci_binary(
@@ -71,3 +78,63 @@ def add_rct_gold_standard_line(
         ]
     ).reset_index(drop=True)
     return results_w_gold_standard
+
+
+def hist_plot_binary_treatment_hte(
+    cate_results: pd.DataFrame,
+    cate_feature_name: str,
+    target_set: str = "cate_predictions",
+):
+    """Draw a box plot for exploring treatment heterogeneity
+    along a binary treatment.
+
+    Returns:
+        _type_: _description_
+    """
+    cate_results_ = cate_results.copy()
+    label_cate_feature_name = LABEL_MAPPING_HTE_FEATURE_COL[cate_feature_name]
+    label_mapping_binary_feature = LABEL_MAPPING_HTE_BINARY_NAME[
+        label_cate_feature_name
+    ]
+    cate_results_[label_cate_feature_name] = cate_results_[
+        cate_feature_name
+    ].map(lambda x: label_mapping_binary_feature[x])
+    fig, ax = plt.subplots(figsize=(7, 5))
+    sns.histplot(
+        ax=ax,
+        data=cate_results_,
+        x=target_set,
+        hue=label_cate_feature_name,
+        palette=COLORMAP_HTE,
+        legend=True,
+    )
+    ate = cate_results_[target_set].mean()
+    ate_class_1 = cate_results_.loc[
+        cate_results_[label_cate_feature_name]
+        == label_mapping_binary_feature[1],
+        target_set,
+    ].mean()
+    ate_class_0 = cate_results_.loc[
+        cate_results_[label_cate_feature_name]
+        == label_mapping_binary_feature[0],
+        target_set,
+    ].mean()
+    vline_width = 4
+    ax.axvline(ate, color="black", linestyle="--", linewidth=vline_width)
+    ax.axvline(
+        ate_class_1,
+        color=COLORMAP_HTE[label_mapping_binary_feature[1]],
+        linestyle="--",
+        linewidth=vline_width,
+    )
+    ax.axvline(
+        ate_class_0,
+        color=COLORMAP_HTE[label_mapping_binary_feature[0]],
+        linestyle="--",
+        linewidth=vline_width,
+    )
+    ax.set_xlabel("Predicted conditional treatment effect")
+    ax.set_title(
+        f"ATE={ate:.2f}, ATE_white={ate_class_1:.2f}, ATE_non_white={ate_class_0:.2f}"
+    )
+    return fig, ax

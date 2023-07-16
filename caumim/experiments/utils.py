@@ -1,6 +1,7 @@
 from datetime import datetime
 from pathlib import Path
 from typing import Dict
+from attr import dataclass
 from dowhy import CausalModel
 from dowhy.causal_estimator import CausalEstimate
 
@@ -11,6 +12,7 @@ from sklearn.discriminant_analysis import StandardScaler
 from sklearn.impute import SimpleImputer
 from sklearn.pipeline import Pipeline, make_pipeline
 from sklearn.preprocessing import OneHotEncoder
+from econml.sklearn_extensions.linear_model import StatsModelsLinearRegression
 
 from caumim.constants import (
     RANDOM_STATE,
@@ -23,12 +25,25 @@ from caumim.constants import (
 from econml.dr import LinearDRLearner
 from econml.metalearners import TLearner
 from econml.grf import CausalForest
-from econml.dml import LinearDML  # ortho-learning ie. R-like learner.
+from econml.dml import LinearDML, DML  # ortho-learning ie. R-like learner.
 from econml.inference import BootstrapInference
 from joblib import Memory
 
 location = "./cachedir"
 memory = Memory(location, verbose=0)
+
+
+@dataclass
+class CateConfig:
+    expe_name: None
+    cohort_folder: Path
+    outcome_name: str
+    experience_grid_dict: Dict
+    fraction: float = 1.0
+    random_state: int = 0
+    bootstrap_num_samples: int = 50
+    train_test_random_state: int = 0
+    test_size: float = 0.2
 
 
 def log_estimate(estimate: Dict, estimate_folder: str):
@@ -88,7 +103,7 @@ def make_column_transformer(
     return column_transformer
 
 
-ECONML_CATE_LEARNERS = ["LinearDRLearner", "LinearDML"]
+ECONML_CATE_LEARNERS = ["LinearDRLearner", "LinearDML", "DML"]
 ECONML_META_LEARNERS = ["TLearner"]
 
 ECONML_LEARNERS = [*ECONML_CATE_LEARNERS, *ECONML_META_LEARNERS, "CausalForest"]
@@ -97,8 +112,17 @@ DEFAULT_BS_NUM_SAMPLES = 100
 
 
 class InferenceWrapper(BaseEstimator):
+
     """
     Wrapper for all estimation methods (from dowhy or econml).
+
+    treatment_pipeline: Model for the treatment allocation
+    outcome_pipeline: Model for the outcome
+    estimation_method: Causal estimator (IPW, matching, Doubly Machine Learning, etc...)
+    outcome_name: column name of the outcome
+    treatment_name: column name of the treatment
+    bootstrap_num_samples: Number of bootstrap samples for the confidence interval
+    model_final: Final estimator used for CATE estimator
     """
 
     def __init__(
@@ -109,6 +133,7 @@ class InferenceWrapper(BaseEstimator):
         outcome_name: str,
         treatment_name: str,
         bootstrap_num_samples: int = DEFAULT_BS_NUM_SAMPLES,
+        model_final: BaseEstimator = None,
     ) -> None:
         super().__init__()
         self.treatment_pipeline = treatment_pipeline
@@ -120,8 +145,23 @@ class InferenceWrapper(BaseEstimator):
             f"{self.estimation_method} not supported."
         )
         self.bootstrap_num_samples = bootstrap_num_samples
+        self.model_final = model_final
 
-    def fit(self, X, y):
+    def fit(self, X, y, X_cate=None):
+        """Fit the inference estimator independently from the underlying package.
+
+        Args:
+            X (_type_): Confounders and treatment
+            y (_type_): Outcome of interest
+            X_cate (_type_, optional): Feature on which . Defaults to None.
+
+        Raises:
+            self._not_supported_estimation_method: _description_
+            self._not_supported_estimation_method: _description_
+
+        Returns:
+            _type_: _description_
+        """
         if self.estimation_method.startswith("backdoor."):
             self.inference_estimator_ = _fit_dowhy(
                 X=X,
@@ -144,7 +184,7 @@ class InferenceWrapper(BaseEstimator):
                 dr_learner.fit(
                     y,
                     a,
-                    X=None,
+                    X=X_cate,
                     W=X_,
                     inference=BootstrapInference(
                         n_bootstrap_samples=self.bootstrap_num_samples
@@ -179,7 +219,31 @@ class InferenceWrapper(BaseEstimator):
                 dml_learner.fit(
                     y,
                     a,
-                    X=None,
+                    X=X_cate,
+                    W=X_,
+                    inference=BootstrapInference(
+                        n_bootstrap_samples=self.bootstrap_num_samples
+                    ),
+                )
+                self.inference_estimator_ = dml_learner
+            elif self.estimation_method == "DML":
+                # default to linear dml
+                if self.model_final is None:
+                    self.model_final = StatsModelsLinearRegression(
+                        fit_intercept=False
+                    )
+                dml_learner = DML(
+                    model_t=self.treatment_pipeline["estimator"],
+                    model_y=self.outcome_pipeline["estimator"],
+                    model_final=self.model_final,
+                    discrete_treatment=True,
+                    cv=5,
+                    random_state=RANDOM_STATE,
+                )
+                dml_learner.fit(
+                    y,
+                    a,
+                    X=X_cate,
                     W=X_,
                     inference=BootstrapInference(
                         n_bootstrap_samples=self.bootstrap_num_samples
@@ -225,7 +289,7 @@ class InferenceWrapper(BaseEstimator):
                     results[RESULT_ATE_LB],
                     results[RESULT_ATE_UB],
                 ) = ate_inference.conf_int_mean()
-                results
+
             elif self.estimation_method == "CausalForest":
                 (
                     ate_point_estimates,
@@ -236,8 +300,17 @@ class InferenceWrapper(BaseEstimator):
                 results[RESULT_ATE] = ate_point_estimates.mean()
                 results[RESULT_ATE_LB] = lb_point_estimates.mean()
                 results[RESULT_ATE_UB] = ub_point_estimates.mean()
-                results
 
+        return results
+
+    def predict_cate(self, X_cate, alpha=0.05):
+        results = {}
+        for col in X_cate.columns:
+            results[f"X_cate__{col}"] = X_cate[col].values
+        results["cate_predictions"] = self.inference_estimator_.effect(X_cate)
+        lb, ub = self.inference_estimator_.effect_interval(X_cate, alpha=alpha)
+        results["cate_lb"] = lb
+        results["cate_ub"] = ub
         return results
 
 

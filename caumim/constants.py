@@ -2,6 +2,7 @@ import os
 from pathlib import Path
 
 from dotenv import load_dotenv
+from seaborn import color_palette
 
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
 
@@ -122,4 +123,28 @@ IDENTIFICATION2LABELS = {
     "CausalForest": "Causal Forest",
     "LinearDML": "Double Machine Learning",
     "LinearDRLearner": "Doubly Robust (AIPW)",
+}
+
+# HTE reports constants
+COLORMAP = color_palette("tab10")
+
+LABEL_WHITE = "White"
+LABEL_NON_WHITE = "Non-white"
+LABEL_FEMALE = "Female"
+LABEL_MALE = "Male"
+
+COLORMAP_HTE = {
+    LABEL_WHITE: COLORMAP[0],
+    LABEL_NON_WHITE: COLORMAP[2],
+    LABEL_MALE: COLORMAP[1],
+    LABEL_FEMALE: COLORMAP[3],
+}
+LABEL_MAPPING_HTE_FEATURE_COL = {
+    "X_cate__Female": "Sex",
+    "X_cate__White": "Race",
+    "X_cate__admission_age": "Age",
+}
+LABEL_MAPPING_HTE_BINARY_NAME = {
+    "Race": {0: LABEL_WHITE, 1: LABEL_NON_WHITE},
+    "Sex": {0: LABEL_MALE, 1: LABEL_FEMALE},
 }
