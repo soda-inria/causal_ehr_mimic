@@ -126,6 +126,7 @@ IDENTIFICATION2LABELS = {
 }
 
 # HTE reports constants
+LABEL_CATE = "Predicted conditional treatment effect"
 COLORMAP = color_palette("tab10")
 
 LABEL_WHITE = "White"

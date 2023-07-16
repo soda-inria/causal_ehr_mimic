@@ -9,6 +9,7 @@ import polars as pl
 import pandas as pd
 import numpy as np
 from sklearn import clone
+from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import (
     average_precision_score,
     brier_score_loss,
@@ -65,9 +66,13 @@ cate_config = CateConfig(
             # "CausalForest",
         ],
         "estimator": [ESTIMATOR_RF],
-        "model_final": [StatsModelsLinearRegression(fit_intercept=False)],
+        "model_final": [
+            StatsModelsLinearRegression(fit_intercept=False),
+            Ridge(fit_intercept=False, random_state=0),
+            RandomForestRegressor(random_state=0),
+        ],
     },
-    fraction=0.1,
+    fraction=1,
     random_state=0,
     train_test_random_state=0,
     bootstrap_num_samples=10,
@@ -394,6 +399,7 @@ def run_cate_experiment(config: CateConfig):
         results["compute_time"] = (datetime.now() - t0).total_seconds()
         results["cohort_name"] = cohort_folder.name
         results["outcome_name"] = outcome_name
+        results["model_final"] = str(run_config["model_final"]).split("(")[0]
         log_estimate(results, log_folder)
 
 

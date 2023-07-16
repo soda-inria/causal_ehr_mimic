@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 from caumim.constants import (
     COLORMAP_HTE,
+    LABEL_CATE,
     LABEL_MAPPING_HTE_BINARY_NAME,
     LABEL_MAPPING_HTE_FEATURE_COL,
     LABEL_NON_WHITE,
@@ -133,7 +134,7 @@ def hist_plot_binary_treatment_hte(
         linestyle="--",
         linewidth=vline_width,
     )
-    ax.set_xlabel("Predicted conditional treatment effect")
+    ax.set_xlabel(LABEL_CATE)
     ax.set_title(
         f"ATE={ate:.2f}, ATE_white={ate_class_1:.2f}, ATE_non_white={ate_class_0:.2f}"
     )

@@ -22,10 +22,10 @@ from caumim.constants import (
     MIN_PS_SCORE,
 )
 
-from econml.dr import LinearDRLearner
 from econml.metalearners import TLearner
 from econml.grf import CausalForest
-from econml.dml import LinearDML, DML  # ortho-learning ie. R-like learner.
+from econml.dml import DML  # ortho-learning ie. R-like learner.
+from econml.dr import DRLearner
 from econml.inference import BootstrapInference
 from joblib import Memory
 
@@ -173,10 +173,15 @@ class InferenceWrapper(BaseEstimator):
             )
         elif self.estimation_method in ECONML_LEARNERS:
             X_, a = _get_X_a(X, self.treatment_name)
-            if self.estimation_method == "LinearDRLearner":
-                dr_learner = LinearDRLearner(
+            if self.estimation_method == "DRLearner":
+                if self.model_final is None:
+                    self.model_final = StatsModelsLinearRegression(
+                        fit_intercept=True
+                    )
+                dr_learner = DRLearner(
                     model_propensity=self.treatment_pipeline["estimator"],
                     model_regression=self.outcome_pipeline["estimator"],
+                    model_final=self.model_final,
                     min_propensity=MIN_PS_SCORE,
                     cv=5,
                     random_state=RANDOM_STATE,
@@ -208,24 +213,24 @@ class InferenceWrapper(BaseEstimator):
                     ),
                 )
                 self.inference_estimator_ = t_learner
-            elif self.estimation_method == "LinearDML":
-                dml_learner = LinearDML(
-                    model_t=self.treatment_pipeline["estimator"],
-                    model_y=self.outcome_pipeline["estimator"],
-                    discrete_treatment=True,
-                    cv=5,
-                    random_state=RANDOM_STATE,
-                )
-                dml_learner.fit(
-                    y,
-                    a,
-                    X=X_cate,
-                    W=X_,
-                    inference=BootstrapInference(
-                        n_bootstrap_samples=self.bootstrap_num_samples
-                    ),
-                )
-                self.inference_estimator_ = dml_learner
+            # elif self.estimation_method == "LinearDML":
+            #     dml_learner = LinearDML(
+            #         model_t=self.treatment_pipeline["estimator"],
+            #         model_y=self.outcome_pipeline["estimator"],
+            #         discrete_treatment=True,
+            #         cv=5,
+            #         random_state=RANDOM_STATE,
+            #     )
+            #     dml_learner.fit(
+            #         y,
+            #         a,
+            #         X=X_cate,
+            #         W=X_,
+            #         inference=BootstrapInference(
+            #             n_bootstrap_samples=self.bootstrap_num_samples
+            #         ),
+            #     )
+            #     self.inference_estimator_ = dml_learner
             elif self.estimation_method == "DML":
                 # default to linear dml
                 if self.model_final is None:

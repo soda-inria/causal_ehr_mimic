@@ -12,7 +12,7 @@ from caumim.reports_utils import hist_plot_binary_treatment_hte
 %autoreload 2
 
 # %%
-cohort_name = "cate_estimates_20230716__bs_10"
+cohort_name = "cate_estimates_20230716__bs_10_w_intercept"
 ### For IP matching, interesting results with RF which seems to overfit the data and results are dependents on the aggregation strategy.
 results = pd.read_parquet(
     DIR2EXPERIENCES / "albumin_for_sepsis__obs_1d" / cohort_name / "logs"
@@ -48,9 +48,9 @@ print(
     ].count()
 )
 results["ntv"] = results["ntv"].map(lambda x: f"{x:.2f}" if x > 0 else "")
+path2img = DIR2DOCS_IMG / cohort_name
 
-# %%
-run_results = results.iloc[0]
+
 result_columns = [
     "X_cate__White",
     "X_cate__Female",
@@ -59,43 +59,60 @@ result_columns = [
     "cate_lb",
     "cate_ub",
 ]
-cate_results = pd.DataFrame({k: run_results[k] for k in result_columns})
-
-# %%  [markdown]
-## Race CATE
+path2img.mkdir(exist_ok=True, parents=True)
 # %%
-fig, ax = hist_plot_binary_treatment_hte(
-    cate_feature_name="X_cate__White",
-    target_set="cate_predictions",
-    cate_results=cate_results,
-)
+models_final = ["StatsModelsLinearRegression", "Ridge", "RandomForestRegressor"]
 
+# %% [markdown]
+# ## Race CATE
+# %%
+for model_final in models_final:
+    run_results = results.loc[results["model_final"] == model_final].iloc[0]
+    cate_results = pd.DataFrame({k: run_results[k] for k in result_columns})
+ 
+    cate_feature_name = "X_cate__White"
+    fig, ax = hist_plot_binary_treatment_hte(
+        cate_feature_name=cate_feature_name,
+        target_set="cate_predictions",
+        cate_results=cate_results,
+    )
+    estimation_args_str  = f"est__{run_results['estimation_method']}__nuisances__{run_results['treatment_model']}__final_{model_final}"
+    plt.savefig(path2img / f"{cate_feature_name}__{estimation_args_str}.pdf", bbox_inches="tight")
+    plt.show()
 # %% [markdown]
 # ## Sex CATE
 # %%
-fig, ax = hist_plot_binary_treatment_hte(
-    cate_feature_name="X_cate__Female",
-    target_set="cate_predictions",
-    cate_results=cate_results,
-)
-
-# %% [markdown]
-# ## Age Cate
-# %%
-cate_results_ = cate_results.copy()
-cate_results_.sort_values("X_cate__admission_age", inplace=True)
-plt.scatter(
-    cate_results_["X_cate__admission_age"],
-    cate_results_["cate_predictions"],
-)
-plt.fill_between(
-    cate_results_["X_cate__admission_age"], cate_results_["cate_lb"], 
-    cate_results_["cate_ub"], alpha=.4
+for model_final in models_final:
+    run_results = results.loc[results["model_final"] == model_final].iloc[0]
+    cate_results = pd.DataFrame({k: run_results[k] for k in result_columns})
+    cate_feature_name = "X_cate__Female"
+    fig, ax = hist_plot_binary_treatment_hte(
+        cate_feature_name=cate_feature_name,
+        target_set="cate_predictions",
+        cate_results=cate_results,
     )
+    plt.savefig(path2img / f"{cate_feature_name}__{estimation_args_str}.pdf", bbox_inches="tight")
+    plt.show()
+# %% [markdown]
+# ## Age CATE
 # %%
-path2img = DIR2DOCS_IMG / cohort_name
-path2img.mkdir(exist_ok=True, parents=True)
-plt.savefig(path2img / f"{cohort_name}.pdf", bbox_inches="tight")
-plt.savefig(path2img / f"{cohort_name}.png", bbox_inches="tight")
-
+for model_final in models_final:
+    run_results = results.loc[results["model_final"] == model_final].iloc[0]
+    cate_results = pd.DataFrame({k: run_results[k] for k in result_columns})
+    cate_results.sort_values("X_cate__admission_age", inplace=True)
+    fig, ax = plt.subplots(figsize=(10, 5))
+    cate_feature_name = "X_cate__admission_age"
+    ax.scatter(
+        cate_results[cate_feature_name],
+        cate_results["cate_predictions"],
+        c=COLORMAP[0]
+    )
+    ax.fill_between(
+        cate_results["X_cate__admission_age"], cate_results["cate_lb"], 
+        cate_results["cate_ub"], alpha=.4, color=COLORMAP[0]
+        )
+    ax.set_xlabel("Age")
+    ax.set_ylabel(LABEL_CATE)
+    plt.savefig(path2img / f"{cate_feature_name}__{estimation_args_str}.pdf", bbox_inches="tight")
+    plt.show()
 # %%
