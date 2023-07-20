@@ -113,14 +113,17 @@ cate_feature_name = "X_cate__admission_age"
 
 models_final = ["Ridge", "RandomForestRegressor"]
 fix, ax = plt.subplots(2, 1, figsize=(6, 3), sharex=True)
+cat_white  = 1
+cat_female = 0
+cat_shock = 0
 for i, model_final in enumerate(models_final):
     run_results = results.loc[results["model_final"] == model_final].iloc[0]
     cate_results = pd.DataFrame({k: run_results[k] for k in result_columns})
     cate_results_plot = cate_results.loc[
-        (cate_results["X_cate__White"] == 1)
+        (cate_results["X_cate__White"] == cat_white)
         &
-         (cate_results["X_cate__Female"] == 0)
-         & (cate_results["X_cate__septic_shock"] == 0)
+         (cate_results["X_cate__Female"] == cat_female)
+         & (cate_results["X_cate__septic_shock"] == cat_shock)
     ]
     sns.scatterplot(
         ax=ax[i],
@@ -131,9 +134,10 @@ for i, model_final in enumerate(models_final):
     ax[i].set_ylabel(f"CATE with final\n {model_final}")
     ax[1].set_ylabel(f"CATE with final\n Random Forest")
 ax[1].set_xlabel("Age at admission")
-estimation_args_str  = f"est__{run_results['estimation_method']}__nuisances__{run_results['treatment_model']}__final_{model_final}"
-plt.savefig(path2img / f"cate_age_forest_failure__{estimation_args_str}.pdf", bbox_inches="tight")
-plt.savefig(path2img / f"cate_age_forest_failure__{estimation_args_str}.jpg", bbox_inches="tight")
+estimation_args_str  = f"est__{run_results['estimation_method']}__nuisances__{run_results['treatment_model']}__final_{model_final}" 
+xp_name = f"cate_age_forest_failure_w{cat_white}_f{cat_female}_shock{cat_shock}_{estimation_args_str}"
+plt.savefig(path2img / f"{xp_name}.pdf", bbox_inches="tight")
+plt.savefig(path2img / f"{xp_name}.jpg", bbox_inches="tight")
 plt.show()
 #%%
 # # Failure mode of the final forest model for age 

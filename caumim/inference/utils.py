@@ -38,6 +38,7 @@ def make_random_search_pipeline(
         n_iter=n_iter,
         n_jobs=-1,
         scoring=scoring_,
+        pre_dispatch=2,
     )
 
     return pipeline

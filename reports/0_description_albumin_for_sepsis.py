@@ -26,6 +26,7 @@ from caumim.variables.utils import (
 )
 from caumim.description.utils import Flowchart
 
+MAIN_FIGURE = True
 # list available mimic tables
 tables = [file_.name for file_ in list(DIR2MIMIC.iterdir())]
 tables.sort(reverse=True)
@@ -128,7 +129,7 @@ inclusion_criteria_full_stay = pd.read_parquet(
 # Change the inclusion criteria to be the full stay / or the first 24 hours
 # instead of only up to the intervention.
 acceptable_followup_windows = ["full_icu_stay", "24h", "up_to_intervention"]
-followup_window = "up_to_intervention"
+followup_window = "24h"
 
 if followup_window == "full_icu_stay":
     inclusion_criteria_full_stay[
@@ -252,42 +253,54 @@ for cat_col in feature_types.categorical_features:
     )
 categorical_features_one_hot += categorical_encode.columns.tolist()
 # %%
-# To avoid plotting both category for binary features:
-# limit_binary = {
-#     k: 1
-#     for k in [*feature_types.binary_features, *categorical_features_one_hot]
-# }
-mytable = TableOne(
-    patient_full_features[
-        [
-            COLNAME_INTERVENTION_STATUS,
+for MAIN_FIGURE in [True, False]:
+    # To avoid plotting both category for binary features:
+    if MAIN_FIGURE:
+        described_features = [
+            "Female",
+            "White",
+            "Emergency admission",
+            "admission_age",
+            "SOFA",
+            "lactate",
+        ]
+        categoricals = ["Female", "White", "Emergency admission"]
+    else:
+        described_features = [
             *feature_types.binary_features,
             *categorical_features_one_hot,
             *feature_types.numerical_features,
             *COMMON_DELTAS,
         ]
-    ],
-    categorical=[
-        *feature_types.binary_features,
-        *categorical_features_one_hot,
-    ],
-    # limit=limit_binary,
-    groupby=COLNAME_INTERVENTION_STATUS,
-)
+        categoricals = [
+            *feature_types.binary_features,
+            *categorical_features_one_hot,
+        ]
+    mytable = TableOne(
+        patient_full_features[[COLNAME_INTERVENTION_STATUS, *described_features]],
+        categorical=categoricals,
+        # limit=limit_binary,
+        groupby=COLNAME_INTERVENTION_STATUS,
+        pval=True
+    )
 
-# dirty fix to keep only class one for  binary features
-table_1_ = mytable.tableone.reset_index()
-table_1_ = table_1_.loc[table_1_["level_1"].isin(["", "1", "1.0"])].drop(
-    columns="level_1"
-)
-table_1_.columns = table_1_.columns.droplevel(0)
-table_1_.rename(
-    columns={"0": "Cristalloids only", "1": "Cristalloids + Albumin"},
-    inplace=True,
-)
-table_1_.set_index("", inplace=True)
-mytable.tableone = table_1_
-mytable.to_latex = mytable.tableone.to_latex
-mytable.to_latex(saving_path / f"table1_{followup_window}.tex")
-mytable.tableone
+    # dirty fix to keep only class one for  binary features
+    table_1_ = mytable.tableone.reset_index()
+    table_1_ = table_1_.loc[table_1_["level_1"].isin(["", "1", "1.0"])].drop(
+        columns="level_1"
+    )
+    table_1_.columns = table_1_.columns.droplevel(0)
+    table_1_.rename(
+        columns={"0": "Cristalloids only", "1": "Cristalloids + Albumin"},
+        inplace=True,
+    )
+    table_1_.set_index("", inplace=True)
+    mytable.tableone = table_1_
+    mytable.to_latex = mytable.tableone.to_latex
+    if MAIN_FIGURE:
+        fig_name = f"table1_{followup_window}.tex"
+    else:
+        fig_name = f"table1_{followup_window}_supplementary.tex"
+    mytable.to_latex(saving_path / fig_name)
+    mytable.tableone
 # %%
