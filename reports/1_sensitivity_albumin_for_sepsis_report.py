@@ -9,14 +9,15 @@ from caumim.constants import *
 from caumim.framing.albumin_for_sepsis import COHORT_CONFIG_ALBUMIN_FOR_SEPSIS
 from caumim.framing.utils import create_cohort_folder
 from caumim.reports_utils import add_rct_gold_standard_line
+from copy import deepcopy
 
-IS_MAIN_FIGURE = True
+IS_MAIN_FIGURE = False
 # %%
-cohort_dir = create_cohort_folder(COHORT_CONFIG_ALBUMIN_FOR_SEPSIS)
+
+cohort_dir = create_cohort_folder(deepcopy(COHORT_CONFIG_ALBUMIN_FOR_SEPSIS))
 cohort_name = cohort_dir.name
-expe_name = "estimates_20230523__est_lr_rf"  #
 expe_name = "estimates_20230712__est_lr_rf__bs_50"
-# expe_name = "estimates_20230516203739"
+#    expe_name = "estimates_20230523__est_lr_rf__bs_10"
 ### For IP matching, interesting results with RF which seems to overfit the data and results are dependents on the aggregation strategy.
 raw_results = pd.read_parquet(
     DIR2EXPERIENCES / cohort_name / expe_name / "logs"
@@ -24,44 +25,47 @@ raw_results = pd.read_parquet(
 
 if IS_MAIN_FIGURE:
     # mask the first aggregation which does not affect the results
-    mask_forest = raw_results["estimation_method"] == "CausalForest"
-    mask_last_agg = raw_results["event_aggregations"] == "['last']"
+    mask_causal_estimator = raw_results["estimation_method"].isin(
+        ["CausalForest"]  # , "LinearDRLearner"]
+    )
+    mask_agg = raw_results["event_aggregations"].isin(["['last']", "['first']"])
     # mask causal forests
     results = add_rct_gold_standard_line(
-        raw_results[~mask_last_agg & ~mask_forest]
+        raw_results[~mask_agg & ~mask_causal_estimator]
     )
 else:
     results = add_rct_gold_standard_line(raw_results)
 outcome_name = COLNAME_MORTALITY_28D
 
-# %%
+
+mask_no_models = results["estimation_method"].isin(
+    ["Difference in mean", LABEL_RCT_GOLD_STANDARD_ATE]
+)
 compute_times = results[
     ["estimation_method", "compute_time", "outcome_model", "event_aggregations"]
-].loc[
-    ~results["estimation_method"].isin(
-        ["Difference in mean", LABEL_RCT_GOLD_STANDARD_ATE]
+].loc[~mask_no_models]
+if IS_MAIN_FIGURE:
+    results["label"] = "Est=" + results["treatment_model"]
+else:
+    results["label"] = (
+        "Agg="
+        + results["event_aggregations"].map(
+            lambda x: x.split(".")[-1].replace("()", "")
+        )
+        # + "\nidentification:"
+        # + results["estimation_method"].map(
+        #     lambda x: IDENTIFICATION2LABEL[x]
+        #     if x in IDENTIFICATION2LABEL.keys()
+        #     else x
+        # )
+        + ", Est="
+        + results["treatment_model"]
     )
+results.loc[mask_no_models, "label"] = results.loc[
+    mask_no_models, "estimation_method"
 ]
-results["label"] = (
-    "Agg="
-    + results["event_aggregations"].map(
-        lambda x: x.split(".")[-1].replace("()", "")
-    )
-    # + "\nidentification:"
-    # + results["estimation_method"].map(
-    #     lambda x: IDENTIFICATION2LABEL[x]
-    #     if x in IDENTIFICATION2LABEL.keys()
-    #     else x
-    # )
-    + ", Est="
-    + results["treatment_model"]
-)
-results.loc[
-    results["estimation_method"].isin(
-        ["Difference in mean", LABEL_RCT_GOLD_STANDARD_ATE]
-    ),
-    "label",
-] = ""
+NO_MODEL_GROUP_LABEL = ""
+results.loc[mask_no_models, "estimation_method"] = NO_MODEL_GROUP_LABEL
 results["estimation_method"] = results["estimation_method"].map(
     lambda x: IDENTIFICATION2LABELS[x]
     if x in IDENTIFICATION2LABELS.keys()
@@ -75,10 +79,19 @@ print(
         "event_aggregations"
     ].count()
 )
+group_order = [NO_MODEL_GROUP_LABEL] + [
+    ident_
+    for ident_ in list(IDENTIFICATION2LABELS.values())
+    if ident_ in results["estimation_method"].unique()
+]
 # %%
 import forestplot as fp
 
-# TODO: add the NTV on the forest plot.
+if IS_MAIN_FIGURE:
+    figsize = (3, 4.5)
+else:
+    figsize = (5, 12)
+
 axes = fp.forestplot(
     results,  # the dataframe with resultcodes data
     estimate=RESULT_ATE,  # col containing estimated effect size
@@ -89,30 +102,21 @@ axes = fp.forestplot(
     xlabel=f"ATE on {OUTCOME2LABELS[outcome_name]}",  # x-label title
     # annote=["treatment_model", "event_aggregation"],  # columns to annotate
     groupvar="estimation_method",  # group variable
-    group_order=[
-        ident_
-        for ident_ in list(IDENTIFICATION2LABELS.values())
-        if ident_ in results["estimation_method"].unique()
-    ],
-    # rightannote=["ntv"],  # columns to report on right of plot
-    # right_annoteheaders=["Overlap measure as Normalized Total Variation"],
-    figsize=(5, 12),
+    group_order=group_order,
+    figsize=figsize,
     color_alt_rows=True,
     sortby="sortby",
+    **{"marker": "D"},
 )
-# axes.axvline(
-#     VALUE_RCT_GOLD_STANDARD_ATE, linestyle="--", color="salmon", linewidth=2
-# )
-# axes.text(
-#     VALUE_RCT_GOLD_STANDARD_ATE,
-#     1,
-#     LABEL_RCT_GOLD_STANDARD_ATE,
-#     transform=axes.get_xaxis_transform(),
-#     fontsize=12,
-#     color="salmon",
-# )
 axes.set(xlim=(-0.15, 0.1))
+if IS_MAIN_FIGURE:
+    outlier_x = 12
+else:
+    outlier_x = 20
+axes.text(0.1, outlier_x, "Outlier ▶", ha="left", va="center")
+
 path2img = DIR2DOCS_IMG / cohort_name
+
 path2img.mkdir(exist_ok=True, parents=True)
 if not IS_MAIN_FIGURE:
     expe_name = expe_name + "_supplementary"

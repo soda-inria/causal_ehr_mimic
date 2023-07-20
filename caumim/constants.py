@@ -127,25 +127,38 @@ IDENTIFICATION2LABELS = {
 
 # HTE reports constants
 LABEL_CATE = "Predicted conditional treatment effect"
-COLORMAP = color_palette("tab10")
+COLORMAP = color_palette("tab20")
 
 LABEL_WHITE = "White"
 LABEL_NON_WHITE = "Non-white"
 LABEL_FEMALE = "Female"
 LABEL_MALE = "Male"
+LABEL_NO_SHOCK = "No shock"
+LABEL_SHOCK = "Shock"
+LABEL_AGE_60M = "< 60"
+LABEL_AGE_60P = ">= 60"
+
 
 COLORMAP_HTE = {
-    LABEL_WHITE: COLORMAP[0],
-    LABEL_NON_WHITE: COLORMAP[2],
-    LABEL_MALE: COLORMAP[1],
-    LABEL_FEMALE: COLORMAP[3],
+    LABEL_WHITE: COLORMAP[11],
+    LABEL_NON_WHITE: COLORMAP[10],
+    LABEL_FEMALE: COLORMAP[2],
+    LABEL_MALE: COLORMAP[3],
+    LABEL_NO_SHOCK: COLORMAP[7],
+    LABEL_SHOCK: COLORMAP[6],
+    LABEL_AGE_60M: COLORMAP[1],
+    LABEL_AGE_60P: COLORMAP[0],
 }
 LABEL_MAPPING_HTE_FEATURE_COL = {
     "X_cate__Female": "Sex",
     "X_cate__White": "Race",
     "X_cate__admission_age": "Age",
+    "X_cate__admission_age_bin": "Age",
+    "X_cate__septic_shock": "Septic shock",
 }
 LABEL_MAPPING_HTE_BINARY_NAME = {
+    "Septic shock": {0: LABEL_NO_SHOCK, 1: LABEL_SHOCK},
+    "Age": {0: LABEL_AGE_60M, 1: LABEL_AGE_60P},
     "Race": {0: LABEL_WHITE, 1: LABEL_NON_WHITE},
     "Sex": {0: LABEL_MALE, 1: LABEL_FEMALE},
 }

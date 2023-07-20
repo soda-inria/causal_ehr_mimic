@@ -85,6 +85,7 @@ def hist_plot_binary_treatment_hte(
     cate_results: pd.DataFrame,
     cate_feature_name: str,
     target_set: str = "cate_predictions",
+    ax: plt.Axes = None,
 ):
     """Draw a box plot for exploring treatment heterogeneity
     along a binary treatment.
@@ -100,7 +101,8 @@ def hist_plot_binary_treatment_hte(
     cate_results_[label_cate_feature_name] = cate_results_[
         cate_feature_name
     ].map(lambda x: label_mapping_binary_feature[x])
-    fig, ax = plt.subplots(figsize=(7, 5))
+    if ax is None:
+        fig, ax = plt.subplots(figsize=(7, 5))
     sns.histplot(
         ax=ax,
         data=cate_results_,
@@ -136,6 +138,6 @@ def hist_plot_binary_treatment_hte(
     )
     ax.set_xlabel(LABEL_CATE)
     ax.set_title(
-        f"ATE={ate:.2f}, ATE_white={ate_class_1:.2f}, ATE_non_white={ate_class_0:.2f}"
+        f"ATE={ate:.2f}, ATE({label_mapping_binary_feature[1]})={ate_class_1:.2f}, ATE({label_mapping_binary_feature[0]})={ate_class_0:.2f}"
     )
     return fig, ax

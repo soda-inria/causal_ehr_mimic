@@ -103,7 +103,7 @@ def make_column_transformer(
     return column_transformer
 
 
-ECONML_CATE_LEARNERS = ["LinearDRLearner", "LinearDML", "DML"]
+ECONML_CATE_LEARNERS = ["DRLearner", "DML"]
 ECONML_META_LEARNERS = ["TLearner"]
 
 ECONML_LEARNERS = [*ECONML_CATE_LEARNERS, *ECONML_META_LEARNERS, "CausalForest"]
@@ -213,24 +213,6 @@ class InferenceWrapper(BaseEstimator):
                     ),
                 )
                 self.inference_estimator_ = t_learner
-            # elif self.estimation_method == "LinearDML":
-            #     dml_learner = LinearDML(
-            #         model_t=self.treatment_pipeline["estimator"],
-            #         model_y=self.outcome_pipeline["estimator"],
-            #         discrete_treatment=True,
-            #         cv=5,
-            #         random_state=RANDOM_STATE,
-            #     )
-            #     dml_learner.fit(
-            #         y,
-            #         a,
-            #         X=X_cate,
-            #         W=X_,
-            #         inference=BootstrapInference(
-            #             n_bootstrap_samples=self.bootstrap_num_samples
-            #         ),
-            #     )
-            #     self.inference_estimator_ = dml_learner
             elif self.estimation_method == "DML":
                 # default to linear dml
                 if self.model_final is None:

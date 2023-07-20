@@ -17,8 +17,8 @@ from caumim.variables.selection import get_event_covariates_albumin_zhou
 from caumim.variables.utils import (
     feature_emergency_at_admission,
     feature_insurance_medicare,
+    get_measurement_from_mimic_concept_tables,
 )
-from caumim.variables.aggregation import get_event_aggregation_polars
 
 from sklearn import clone
 from sklearn.pipeline import make_pipeline
@@ -69,6 +69,8 @@ outcome_name = COLNAME_MORTALITY_28D
 event_features, feature_types = get_event_covariates_albumin_zhou(
     target_trial_population
 )
+
+
 # %%
 aggregate_functions = {
     "first": pl.col(COLNAME_VALUE).first(),

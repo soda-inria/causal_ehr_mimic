@@ -22,16 +22,20 @@ COHORT_NAME2LABEL = {
 }
 
 # %%
-expe_name = "immortal_time_bias_double_robust_forest_agg_last__bs_50"
+# expe_name = "immortal_time_bias_double_robust_forest_agg_last__bs_50"
+expe_name = "immortal_time_bias_double_robust_forest_agg_first_last__bs_50"
 results = pd.read_parquet(DIR2EXPERIENCES / expe_name / "logs")
-# %%
+results = add_rct_gold_standard_line(results)
 # Create nice labels for forest plot
+mask_no_models = results["estimation_method"].isin(
+    ["Difference in mean", LABEL_RCT_GOLD_STANDARD_ATE]
+)
 outcome_name = results["outcome_name"].unique()[0]
 results["observation_period"] = results["cohort_name"].map(
     lambda x: COHORT_NAME2LABEL[x] if x in COHORT_NAME2LABEL.keys() else x
 )
 # add rct gold standard
-results = add_rct_gold_standard_line(results)
+# %%
 results["label"] = (
     "Agg="
     + results["event_aggregations"].map(
@@ -46,11 +50,8 @@ results["label"] = (
     + " + "
     + results["treatment_model"]
 )
-for k in ["Difference in mean", LABEL_RCT_GOLD_STANDARD_ATE]:
-    results.loc[
-        results["estimation_method"] == k, "label"
-    ] = IDENTIFICATION2LABELS[k]
-
+NO_MODEL_GROUP_LABEL = ""
+results.loc[mask_no_models, "estimation_method"] = NO_MODEL_GROUP_LABEL
 results["estimation_method"] = results["estimation_method"].map(
     lambda x: IDENTIFICATION2LABELS[x]
     if x in IDENTIFICATION2LABELS.keys()

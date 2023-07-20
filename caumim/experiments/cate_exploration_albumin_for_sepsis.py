@@ -35,7 +35,10 @@ from caumim.experiments.utils import (
 from caumim.inference.scores import normalized_total_variation
 from caumim.inference.utils import make_random_search_pipeline
 
-from caumim.variables.selection import get_event_covariates_albumin_zhou
+from caumim.variables.selection import (
+    get_event_covariates_albumin_zhou,
+    get_septic_shock_from_features,
+)
 from caumim.variables.utils import (
     feature_emergency_at_admission,
     feature_insurance_medicare,
@@ -127,7 +130,7 @@ def run_cate_experiment(config: CateConfig):
         "White",
     ]
     # TODO: might be better in the config
-    cate_feature_names = ["admission_age", "Female", "White"]
+    cate_feature_names = ["admission_age", "Female", "White", "septic_shock"]
 
     # Static confounders are static features minus CATE features
     if cate_feature_names is not None:
@@ -139,6 +142,11 @@ def run_cate_experiment(config: CateConfig):
     event_features, feature_types = get_event_covariates_albumin_zhou(
         target_trial_population
     )
+    # adding septic shock
+    target_trial_population = get_septic_shock_from_features(
+        target_trial_population
+    )
+
     experience_grid_dict = {
         "event_aggregations": config.experience_grid_dict["event_aggregations"],
         "estimation_method": config.experience_grid_dict["estimation_method"],

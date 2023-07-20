@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from typing import List, Tuple
+import pandas as pd
 import polars as pl
 from sklearn.utils import Bunch
 
@@ -423,3 +424,105 @@ def get_event_covariates_albumin_zhou(
     )
 
     return event_features, feature_types
+
+
+from caumim.utils import to_polars
+
+
+def get_septic_shock_from_features(included_stays: pd.DataFrame):
+    """
+    Create septic shock variable for a population of patients. Only features
+    belonging to the included stays and occuring before the end of the
+    observation period (specific to each patient) are considered.
+
+    Using the definition of septic
+    shock as of "The Third International Consensus Definitions for Sepsis and
+    Septic Shock (Sepsis-3)" (box 3)
+      - sepsis patient
+      - persisting hypotension requiring vasopressors to maintain MAP ≥65 mm Hg:
+        simplified to receiving vasopressors
+      - having a serum lactate level >2 mmol/L (18 mg/dL) despite adequate
+        volume resuscitation: simplified to lactate > 2 mmmol/L
+    Args:
+        target_trial_population (pd.DataFrame): _description_
+
+    Raises:
+        ValueError: _description_
+    """
+    if not included_stays.columns:
+        raise ValueError(
+            "Target population should have an inclusion start column"
+        )
+    vasopressors_str = [
+        "dopamine",
+        "epinephrine",
+        "norepinephrine",
+        "phenylephrine",
+        "vasopressin",
+        "dobutamine",
+        "milrinone",
+    ]
+
+    vasopressors = pl.scan_parquet(
+        DIR2MIMIC / "mimiciv_derived.vasoactive_agent/"
+    ).with_columns(
+        pl.col("starttime").alias("charttime"),
+    )
+    # sepsis
+    sepsis3_stays = pl.read_parquet(DIR2MIMIC / "mimiciv_derived.sepsis3")
+    sepsis3_stays = sepsis3_stays.filter(pl.col("sepsis3") == True)
+
+    # vasopressors
+    vasopressors_event = (
+        get_measurement_from_mimic_concept_tables(
+            measurement_concepts=vasopressors_str,
+            measurement_table=vasopressors,
+        )
+        .drop("domain")
+        .with_columns(
+            pl.lit("medication").alias(COLNAME_DOMAIN),
+            pl.lit("vasopressors").alias(COLNAME_CODE),
+            pl.when(pl.col(COLNAME_VALUE) > 0)
+            .then(1)
+            .otherwise(0)
+            .alias(COLNAME_VALUE),
+        )
+    )
+    # lactate
+    blood_gaz_list = ["lactate"]
+    blood_gaz = pl.scan_parquet(DIR2MIMIC / "mimiciv_derived.bg/")
+    blood_gaz_event = get_measurement_from_mimic_concept_tables(
+        measurement_concepts=blood_gaz_list, measurement_table=blood_gaz
+    )
+    lactate_sup_2 = blood_gaz_event.filter(pl.col(COLNAME_VALUE) >= 2)
+    target_trial_population_septic = to_polars(included_stays).join(
+        sepsis3_stays.select([COLNAME_ICUSTAY_ID, COLNAME_PATIENT_ID]).unique(),
+        on=[COLNAME_ICUSTAY_ID, COLNAME_PATIENT_ID],
+        how="inner",
+    )
+    lactate_sup_2_restricted = restrict_event_to_observation_period(
+        target_trial_population_septic, lactate_sup_2
+    )
+    vasopressors_restricted = restrict_event_to_observation_period(
+        target_trial_population_septic, vasopressors_event
+    )
+
+    septic_shock_patient = (
+        (
+            vasopressors_restricted.select(COLNAME_PATIENT_ID)
+            .unique()
+            .join(
+                lactate_sup_2_restricted.select(COLNAME_PATIENT_ID).unique(),
+                how="inner",
+                on=COLNAME_PATIENT_ID,
+            )
+        )
+        .with_columns(pl.lit(1).alias("septic_shock"))
+        .collect()
+    )
+    included_stays_w_septic_shock = included_stays.join(
+        septic_shock_patient, on=COLNAME_PATIENT_ID, how="left"
+    )
+    return included_stays_w_septic_shock.with_columns(
+        pl.col("septic_shock").fill_null(0)
+    )

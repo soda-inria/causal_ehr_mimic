@@ -14,6 +14,7 @@ from sklearn.utils import Bunch
 from datetime import datetime
 from caumim.framing.albumin_for_sepsis import COHORT_CONFIG_ALBUMIN_FOR_SEPSIS
 from caumim.utils import to_lazyframe
+from caumim.variables.utils import get_measurement_from_mimic_concept_tables
 pd.set_option("display.max_columns", None)
 pd.set_option("display.max_colwidth", 100)
 # %%
@@ -81,6 +82,7 @@ inclusion_criteria = {
 }
 target_population, inclusion_counts = roll_inclusion_criteria(inclusion_criteria)
 target_population.head(3)
+
 # %%
 # 3 - Define the treatment events  
 albumin_itemids = [
