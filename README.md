@@ -7,7 +7,6 @@ This code was used to study the effect of albumin+crystalloids compared to cryst
 
 ## Data
 
-
 ### Data acquisition
 
 0. We first built the data using postgresql following [mimic-code instructions](https://github.com/MIT-LCP/mimic-code/tree/main/mimic-iv/buildmimic/postgres) *=30min-1h*.
