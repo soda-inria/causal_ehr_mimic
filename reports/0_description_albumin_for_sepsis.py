@@ -26,7 +26,6 @@ from caumim.variables.utils import (
 )
 from caumim.description.utils import Flowchart
 
-MAIN_FIGURE = True
 # list available mimic tables
 tables = [file_.name for file_ in list(DIR2MIMIC.iterdir())]
 tables.sort(reverse=True)
@@ -277,11 +276,13 @@ for MAIN_FIGURE in [True, False]:
             *categorical_features_one_hot,
         ]
     mytable = TableOne(
-        patient_full_features[[COLNAME_INTERVENTION_STATUS, *described_features]],
+        patient_full_features[
+            [COLNAME_INTERVENTION_STATUS, *described_features]
+        ],
         categorical=categoricals,
         # limit=limit_binary,
         groupby=COLNAME_INTERVENTION_STATUS,
-        pval=True
+        pval=True,
     )
 
     # dirty fix to keep only class one for  binary features

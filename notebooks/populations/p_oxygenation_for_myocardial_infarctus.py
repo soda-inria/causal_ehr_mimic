@@ -8,10 +8,12 @@ in the MIMIC-IV database.
 from copy import deepcopy
 
 import numpy as np
-from caumim.framing.utils import get_base_population, get_flat_information, get_drug_names_from_str
+from caumim.framing.utils import get_base_population, get_drug_names_from_str
 from caumim.constants import *
 import polars as pl
 import pandas as pd
+
+from caumim.utils import to_polars
 pd.set_option("display.max_columns", None)
 pd.set_option("display.max_colwidth", 100)
 # %%
@@ -46,7 +48,7 @@ print(base_population.shape)
 mi_diagnoses = billing_diagnoses.filter(
     pl.col("icd_code").is_in(infarction_codes["icd_code"])
 )
-mi_diagnoses_icu_detail = mi_diagnoses[["hadm_id"]].unique().join(base_population, on="hadm_id", how="inner")
+mi_diagnoses_icu_detail = mi_diagnoses[["hadm_id"]].unique().join(to_polars(base_population), on="hadm_id", how="inner")
 n_patients_mi = mi_diagnoses_icu_detail.to_pandas()["subject_id"].nunique()
 n_hadm_mi = mi_diagnoses_icu_detail.to_pandas()["hadm_id"].nunique()
 print(f"Number of patients with myocardial infarction: {n_patients_mi}")

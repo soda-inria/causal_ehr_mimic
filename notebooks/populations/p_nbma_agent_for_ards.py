@@ -12,6 +12,8 @@ from caumim.framing.utils import get_base_population
 from caumim.constants import *
 import polars as pl
 import pandas as pd
+
+from caumim.utils import to_lazyframe
 pd.set_option("display.max_columns", None)
 pd.set_option("display.max_colwidth", 100)
 # %%
@@ -27,7 +29,7 @@ print(base_population.shape)
 ards_grace_period_unit_hour = 12
 vitalsign  = pl.scan_parquet(DIR2MIMIC / "mimiciv_derived.vitalsign")
 base_population_vitalsign = vitalsign.join(
-    base_population[["stay_id", "subject_id", "icu_intime"]].lazy(), on="stay_id", how="inner"
+    to_lazyframe(base_population).select(["stay_id", "subject_id", "icu_intime"]), on="stay_id", how="inner"
     ).collect()
 mi_population_spo2_at_admission = base_population_vitalsign.filter(
     (pl.col("charttime") - pl.col("icu_intime")).dt.hours() < ards_grace_period_unit_hour
@@ -36,7 +38,7 @@ mi_population_spo2_at_admission = base_population_vitalsign.filter(
 )
 
 base_population_bg = pl.scan_parquet(DIR2MIMIC / "mimiciv_derived.bg").join(
-    base_population[["hadm_id","subject_id","icu_intime"]].lazy(), on="hadm_id", how="inner"
+    to_lazyframe(base_population).select(["hadm_id","subject_id","icu_intime"]), on="hadm_id", how="inner"
 ).collect()
 mi_population_bg_at_admission = base_population_bg.filter(
     (pl.col("charttime") - pl.col("icu_intime")).dt.hours() <  ards_grace_period_unit_hour
@@ -57,7 +59,7 @@ n_patients_wo_o2_measures = (base_population_with_ards_info[["pao2fio2ratio_medi
 patients_w_ards_at_admission = base_population_with_ards_info.loc[
     base_population_with_ards_info["ards_at_admission"] == True
 ].merge(
-    base_population.to_pandas(), on="subject_id", how="inner"
+    base_population, on="subject_id", how="inner"
 )
 print("Number of patients without any Fi/O2 measures: ", n_patients_wo_o2_measures)
 print(

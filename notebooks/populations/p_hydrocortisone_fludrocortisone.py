@@ -6,10 +6,12 @@ in the MIMIC-IV database.
 %reload_ext autoreload
 %autoreload 2
 import numpy as np
-from caumim.framing.utils import get_base_population, get_flat_information, get_drug_names_from_str
+from caumim.framing.utils import get_base_population, get_drug_names_from_str
 from caumim.constants import *
 import polars as pl
 import pandas as pd
+
+from caumim.utils import to_polars
 pd.set_option("display.max_columns", None)
 pd.set_option("display.max_colwidth", 100)
 # %%
@@ -25,7 +27,7 @@ base_population = get_base_population(
 # sepsis3 ? 
 sepsis3 = pl.read_parquet(DIR2MIMIC / "mimiciv_derived.sepsis3").filter(
     pl.col("sepsis3").eq(True)
-).join(base_population, on="subject_id", how="inner")
+).join((to_polars(base_population)), on="subject_id", how="inner")
 sepsis3_subject_ids = sepsis3["subject_id"].unique().to_pandas()
 sepsis3_stay_ids = sepsis3["stay_id"].unique().to_pandas()
 print("Number of patients with sepsis3: ", len(sepsis3_subject_ids))
