@@ -20,7 +20,7 @@ from caumim.variables.utils import feature_emergency_at_admission, feature_insur
 
 # %%
 config = deepcopy(COHORT_CONFIG_ALBUMIN_FOR_SEPSIS)
-observation_period_day = 3
+observation_period_day = 1
 observation_period_hour = observation_period_day * 24
 config.min_icu_survival_unit_day = observation_period_day
 config.min_los_icu_unit_day = observation_period_day
@@ -102,4 +102,70 @@ static_features = [
         COLNAME_EMERGENCY_ADMISSION,
         COLNAME_INSURANCE_MEDICARE,
     ]
-# 
+# Join static and dynamic features
+train_X_Y = train_patient_features_aggregated.join(
+    to_polars(train_population),
+    on=STAY_KEYS,
+    how="inner",
+)[
+    [
+        *event_features_names,
+        *static_features,
+        #COLNAME_INTERVENTION_STATUS,
+        outcome_name,
+    ]
+].to_pandas()
+test_X_Y = test_patient_features_aggregated.join(
+    to_polars(test_population),
+    on=STAY_KEYS,
+    how="inner",
+)[
+    [
+        *event_features_names,
+        *static_features,
+        #COLNAME_INTERVENTION_STATUS,
+        outcome_name,
+    ]
+
+].to_pandas()
+val_size = test_X_Y.shape[0]
+train_X, val_X, train_Y, val_Y = train_test_split(
+    train_X_Y.drop(outcome_name, axis=1),
+    train_X_Y[outcome_name],
+    test_size=val_size,
+    random_state=42,
+    stratify=train_X_Y[outcome_name],
+)
+
+test_X = test_X_Y.drop(outcome_name, axis=1)
+test_Y = test_X_Y[outcome_name]
+
+# %%
+# training
+# column_transformer = make_column_transformer(
+#             numerical_features=colnames_numerical_features,
+#             categorical_features=colnames_categorical_features,
+#         )
+# using a classifier for the binary outcome (don't want to estimate a proba here)
+
+outcome_pipeline = make_random_search_pipeline(
+    estimator=ESTIMATOR_HGB["treatment_estimator"],
+    param_distributions=ESTIMATOR_HGB["treatment_param_distributions"],
+)
+outcome_pipeline.fit(
+    train_X, train_Y)
+outcome_best_pipeline = outcome_pipeline.best_estimator_
+# %%
+# evaluation
+# in-domain evaluation
+hat_y_val = outcome_best_pipeline.predict_proba(val_X)[:, 1]
+val_scores = score_binary_classification(val_Y, hat_y_val)
+val_scores["dataset"] = "validation"
+# out-of-domain evaluation
+hat_y_test = outcome_best_pipeline.predict_proba(test_X)[:, 1]
+test_scores = score_binary_classification(test_Y, hat_y_test)
+test_scores["dataset"] = "test"
+all_scores = pd.DataFrame([val_scores, test_scores]).set_index("dataset")
+
+display(all_scores)
+#%%
