@@ -1,6 +1,11 @@
 # pipelines
 import numpy as np
-from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
+from sklearn.ensemble import (
+    HistGradientBoostingClassifier,
+    HistGradientBoostingRegressor,
+    RandomForestClassifier,
+    RandomForestRegressor,
+)
 from sklearn.linear_model import LogisticRegression, Ridge
 
 
@@ -30,5 +35,19 @@ ESTIMATOR_RF = {
     "outcome_param_distributions": {
         "estimator__n_estimators": [10, 100, 200],
         "estimator__max_depth": [3, 10, 50],
+    },
+}
+
+ESTIMATOR_HGB = {
+    "name": "HGB",
+    "treatment_estimator": HistGradientBoostingClassifier(early_stopping=True),
+    "treatment_param_distributions": {
+        "estimator__learning_rate": [0.001, 0.01, 0.1, 1],
+        "estimator__max_iter": [10, 50, 100],
+    },
+    "outcome_estimator": HistGradientBoostingRegressor(early_stopping=True),
+    "outcome_param_distributions": {
+        "estimator__n_estimators": [10, 100, 200],
+        "estimator__max_iter": [10, 50, 100],
     },
 }

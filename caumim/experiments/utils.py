@@ -10,6 +10,14 @@ from sklearn.base import BaseEstimator
 from sklearn.compose import ColumnTransformer
 from sklearn.discriminant_analysis import StandardScaler
 from sklearn.impute import SimpleImputer
+from sklearn.metrics import (
+    accuracy_score,
+    average_precision_score,
+    confusion_matrix,
+    precision_score,
+    recall_score,
+    roc_auc_score,
+)
 from sklearn.pipeline import Pipeline, make_pipeline
 from sklearn.preprocessing import OneHotEncoder
 from econml.sklearn_extensions.linear_model import StatsModelsLinearRegression
@@ -350,3 +358,17 @@ def _predict_dowhy(
 
 def _get_X_a(X_a, treatment_name):
     return X_a.drop(columns=treatment_name), X_a[treatment_name]
+
+
+def score_binary_classification(y_true, hat_y_pred):
+    scores = {}
+    hat_y = hat_y_pred >= 0.5
+    scores["n_samples"] = y_true.shape[0]
+    scores["prevalence"] = y_true.mean()
+    scores["accuracy"] = accuracy_score(y_true, hat_y)
+    scores["precision"] = precision_score(y_true, hat_y)
+    scores["recall"] = recall_score(y_true, hat_y)
+    scores["roc_auc"] = roc_auc_score(y_true, hat_y_pred)
+    scores["pr_auc"] = average_precision_score(y_true, hat_y_pred)
+    scores["confusion_matrix"] = confusion_matrix(y_true, hat_y)
+    return scores

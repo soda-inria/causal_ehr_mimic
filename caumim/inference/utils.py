@@ -12,20 +12,15 @@ from sklearn.base import is_classifier
 def make_random_search_pipeline(
     estimator: BaseEstimator,
     param_distributions: Dict,
-    column_transformer: ColumnTransformer,
+    column_transformer: ColumnTransformer = None,
     # estimation_methods: str ,
     n_iter: int = 10,
     random_state: int = 42,
 ):
-    # if estimation_methods == "econml":
-    #     pipeline_steps = [
-    #         ("estimator", estimator),
-    #     ]
-    # else:
-    pipeline_steps = [
-        ("preprocessor", column_transformer),
-        ("estimator", estimator),
-    ]
+    pipeline_steps = []
+    if column_transformer is not None:
+        pipeline_steps.append(("preprocessor", column_transformer))
+    pipeline_steps.append(("estimator", estimator))
     # better to optimize for brier score if we target a binary treatment
     if is_classifier(estimator):
         scoring_ = "neg_brier_score"
@@ -38,7 +33,7 @@ def make_random_search_pipeline(
         n_iter=n_iter,
         n_jobs=-1,
         scoring=scoring_,
-        pre_dispatch=2,
+        # pre_dispatch=2,
     )
 
     return pipeline
