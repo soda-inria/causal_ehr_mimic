@@ -11,7 +11,7 @@ from caumim.framing.utils import create_cohort_folder
 from caumim.reports_utils import add_rct_gold_standard_line
 from copy import deepcopy
 
-IS_MAIN_FIGURE = False
+IS_MAIN_FIGURE = True
 # %%
 
 cohort_dir = create_cohort_folder(deepcopy(COHORT_CONFIG_ALBUMIN_FOR_SEPSIS))
@@ -98,7 +98,6 @@ axes = fp.forestplot(
     ll=RESULT_ATE_LB,
     hl=RESULT_ATE_UB,  # columns containing conf. int. lower and higher limits
     varlabel="label",  # column containing variable label
-    ylabel="Confidence interval",  # y-label title
     xlabel=f"ATE on {OUTCOME2LABELS[outcome_name]}",  # x-label title
     # annote=["treatment_model", "event_aggregation"],  # columns to annotate
     groupvar="estimation_method",  # group variable
@@ -106,7 +105,8 @@ axes = fp.forestplot(
     figsize=figsize,
     color_alt_rows=True,
     sortby="sortby",
-    **{"marker": "D"},
+    ylabel="ATE (95% bootstrap confidence interval)",  # ylabel to print
+    **{"marker": "D", "ylabel1_size": 10, "ylabel1_fontweight": "normal"},
 )
 axes.set(xlim=(-0.15, 0.1))
 if IS_MAIN_FIGURE:

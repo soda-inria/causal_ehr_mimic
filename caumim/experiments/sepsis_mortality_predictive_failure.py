@@ -48,6 +48,7 @@ def train_predictive_failure_experiment(
         experiment_config["experiment_name"]
         + f"__{start_}"
         + f"__obs_{experiment_config['observation_period_day']}"
+        + f"__post_treatment_{experiment_config['post_treatment_features']}"
     )
     dir2results = DIR2EXPERIENCES / expe_name
     dir2results.mkdir(exist_ok=True, parents=True)
@@ -105,9 +106,10 @@ def train_predictive_failure_experiment(
     ]
 
     # redefinition of inclusion start to get back features after treatment for train population
-    train_population[COLNAME_INCLUSION_START] = train_population[
-        "intime"
-    ] + pd.Timedelta(observation_period_hour, unit="h")
+    if experiment_config["post_treatment_features"]:
+        train_population[COLNAME_INCLUSION_START] = train_population[
+            "intime"
+        ] + pd.Timedelta(observation_period_hour, unit="h")
     (
         train_event_features,
         train_feature_types,
@@ -215,6 +217,9 @@ def train_predictive_failure_experiment(
         test_scores = {f"test_{k}": v for k, v in test_scores.items()}
         all_logs = {**val_scores, **test_scores}
         all_logs["random_seed"] = random_seed
+        all_logs["post_treatment_features"] = experiment_config[
+            "post_treatment_features"
+        ]
         all_logs["observation_period_day"] = observation_period_day
         all_logs["model"] = estimator_config["name"]
         all_logs["compute_time"] = (datetime.now() - start_time).total_seconds()
@@ -234,6 +239,7 @@ if __name__ == "__main__":
         "observation_period_day": 1,
         "train_val_random_seeds": list(range(0, 10)),
         "experiment_name": "predictive_failure",
+        "post_treatment_features": False,
     }
     estimator_config = ESTIMATOR_HGB
 

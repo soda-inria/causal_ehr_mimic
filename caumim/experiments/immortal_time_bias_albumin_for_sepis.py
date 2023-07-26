@@ -2,7 +2,11 @@ from sklearn.utils import Bunch
 import polars as pl
 
 from caumim.constants import COLNAME_MORTALITY_28D, COLNAME_VALUE, DIR2COHORT
-from caumim.experiments.configurations import ESTIMATOR_RF, ESTIMATOR_RIDGE
+from caumim.experiments.configurations import (
+    ESTIMATOR_LR,
+    ESTIMATOR_RF,
+    ESTIMATOR_RIDGE,
+)
 from caumim.experiments.sensitivity_albumin_for_sepsis import (
     run_sensitivity_experiment,
 )
@@ -18,10 +22,11 @@ immortal_time_bias_config = Bunch(
                 },
             ],
             "estimation_method": [
-                "DML",
-                "DRLearner",
+                # "DML",
+                # "DRLearner",
+                "backdoor.propensity_score_weighting",
             ],
-            "estimator": [ESTIMATOR_RF],
+            "estimator": [ESTIMATOR_RIDGE, ESTIMATOR_RF],
         },
         "fraction": 1,
         "random_state": 0,

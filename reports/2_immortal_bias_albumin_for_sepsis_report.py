@@ -24,6 +24,7 @@ COHORT_NAME2LABEL = {
 # %%
 # expe_name = "immortal_time_bias_double_robust_forest_agg_last__bs_50"
 expe_name = "immortal_time_bias_double_robust_forest_agg_first_last__bs_30"
+# expe_name = "immortal_time_bias_double_robust_forest_agg_first_last"
 results = pd.read_parquet(DIR2EXPERIENCES / expe_name / "logs")
 # results = add_rct_gold_standard_line(results)
 # Create nice labels for forest plot
@@ -34,7 +35,8 @@ outcome_name = results["outcome_name"].unique()[0]
 results["observation_period"] = results["cohort_name"].map(
     lambda x: COHORT_NAME2LABEL[x] if x in COHORT_NAME2LABEL.keys() else x
 )
-# add rct gold standard
+# drop models with no models
+results = results.loc[~mask_no_models]
 results["label"] = (
     "Agg="
     + results["event_aggregations"].map(
@@ -75,18 +77,18 @@ axes = fp.forestplot(
     ll=RESULT_ATE_LB,
     hl=RESULT_ATE_UB,  # columns containing conf. int. lower and higher limits
     varlabel="label",  # column containing variable label
-    ylabel="Confidence interval",  # y-label title
     xlabel=f"ATE on {OUTCOME2LABELS[outcome_name]}",  # x-label title
     groupvar="observation_period",  # group variable
     group_order=list(COHORT_NAME2LABEL.values()),
     figsize=(4, 4),
     color_alt_rows=True,
-    **{"marker": "D"},
+    ylabel="ATE (95% bootstrap confidence interval)",  # ylabel to print
+    **{"marker": "D", "ylabel1_size": 10, "ylabel1_fontweight": "normal"},
 )
 axes.set(xlim=(-0.075, 0.075))
 
 path2img = DIR2DOCS_IMG / expe_name
 path2img.mkdir(exist_ok=True, parents=True)
-plt.savefig(path2img / f"{expe_name}.pdf", bbox_inches="tight")
-plt.savefig(path2img / f"{expe_name}.png", bbox_inches="tight")
+# plt.savefig(path2img / f"{expe_name}.pdf", bbox_inches="tight")
+# plt.savefig(path2img / f"{expe_name}.png", bbox_inches="tight")
 # %%
