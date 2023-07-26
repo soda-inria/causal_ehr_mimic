@@ -20,7 +20,7 @@ COHORT_NAME2LABEL = {
     "albumin_for_sepsis__obs_1d": "24h",
     "albumin_for_sepsis__obs_3d": "72h",
 }
-
+IS_MAIN_FIGURE = False
 # %%
 # expe_name = "immortal_time_bias_double_robust_forest_agg_last__bs_50"
 expe_name = "immortal_time_bias_double_robust_forest_agg_first_last__bs_30"
@@ -32,6 +32,11 @@ mask_no_models = results["estimation_method"].isin(
     ["Difference in mean", LABEL_RCT_GOLD_STANDARD_ATE]
 )
 outcome_name = results["outcome_name"].unique()[0]
+if IS_MAIN_FIGURE:
+    # mask the first aggregation which does not affect the results
+    mask_causal_estimator = results["estimation_method"].isin(
+        ["DML", "DRLearner"]
+    )
 results["observation_period"] = results["cohort_name"].map(
     lambda x: COHORT_NAME2LABEL[x] if x in COHORT_NAME2LABEL.keys() else x
 )
@@ -51,18 +56,22 @@ results["label"] = (
     + " + "
     + results["treatment_model"]
 )
-results.loc[mask_no_models, "label"] = results.loc[
-    mask_no_models, "estimation_method"
-]
-NO_MODEL_GROUP_LABEL = ""
-results.loc[mask_no_models, "estimation_method"] = NO_MODEL_GROUP_LABEL
 results["estimation_method"] = results["estimation_method"].map(
     lambda x: IDENTIFICATION2LABELS[x]
     if x in IDENTIFICATION2LABELS.keys()
     else x
 )
+results.loc[mask_no_models, "label"] = results.loc[
+    mask_no_models, "estimation_method"
+]
+NO_MODEL_GROUP_LABEL = ""
+results.loc[mask_no_models, "estimation_method"] = NO_MODEL_GROUP_LABEL
 results["sortby"] = (
-    results["treatment_model"] + "_" + results["event_aggregations"]
+    results["estimation_method"]
+    + "_"
+    + results["treatment_model"]
+    + "_"
+    + results["event_aggregations"]
 )
 
 print(
@@ -71,6 +80,12 @@ print(
     ].count()
 )
 # %%
+if IS_MAIN_FIGURE:
+    xlim = (-0.075, 0.075)
+    figsize = (4, 4)
+else:
+    xlim = (-0.12, 0.075)
+    figsize = (6, 6)
 axes = fp.forestplot(
     results,  # the dataframe with results data
     estimate=RESULT_ATE,  # col containing estimated effect size
@@ -80,15 +95,20 @@ axes = fp.forestplot(
     xlabel=f"ATE on {OUTCOME2LABELS[outcome_name]}",  # x-label title
     groupvar="observation_period",  # group variable
     group_order=list(COHORT_NAME2LABEL.values()),
-    figsize=(4, 4),
+    figsize=figsize,
     color_alt_rows=True,
+    sortby="sortby",
     ylabel="ATE (95% bootstrap confidence interval)",  # ylabel to print
     **{"marker": "D", "ylabel1_size": 10, "ylabel1_fontweight": "normal"},
 )
-axes.set(xlim=(-0.075, 0.075))
+axes.set(xlim=xlim)
 
 path2img = DIR2DOCS_IMG / expe_name
 path2img.mkdir(exist_ok=True, parents=True)
-# plt.savefig(path2img / f"{expe_name}.pdf", bbox_inches="tight")
-# plt.savefig(path2img / f"{expe_name}.png", bbox_inches="tight")
+if IS_MAIN_FIGURE:
+    sup_str = "_supp"
+else:
+    sup_str = ""
+plt.savefig(path2img / f"{expe_name}{sup_str}.pdf", bbox_inches="tight")
+plt.savefig(path2img / f"{expe_name}{sup_str}.png", bbox_inches="tight")
 # %%

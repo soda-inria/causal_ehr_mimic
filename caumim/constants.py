@@ -124,7 +124,11 @@ IDENTIFICATION2LABELS = {
     "LinearDML": "Double Machine Learning",
     "LinearDRLearner": "Doubly Robust (AIPW)",
 }
-IDENTIFICATION2SHORT_LABELS = {"DML": "Double ML", "DRLearner": "DR (AIPW)"}
+IDENTIFICATION2SHORT_LABELS = {
+    "DML": "Double ML",
+    "DRLearner": "DR (AIPW)",
+    "backdoor.propensity_score_weighting": "IPW",
+}
 
 # HTE reports constants
 LABEL_CATE = "Predicted conditional treatment effect"
