@@ -1,3 +1,4 @@
+import re
 from matplotlib import pyplot as plt
 import pandas as pd
 import numpy as np
@@ -141,3 +142,37 @@ def hist_plot_binary_treatment_hte(
         f"ATE={ate:.2f}, ATE({label_mapping_binary_feature[1]})={ate_class_1:.2f}, ATE({label_mapping_binary_feature[0]})={ate_class_0:.2f}"
     )
     return fig, ax
+
+
+def add_leading_zero(x):
+    pattern_ = r"^(\d)h$"
+    match = re.search(pattern_, x)
+    if match is not None:
+        replace_ = f"0{match.group(1)}h"
+        return replace_
+    else:
+        return x
+
+
+def add_albumin_label(axes, fontsize=8, x_less=1.15, x_more=0):
+    axes.text(
+        x_more,
+        0.95,
+        "⬅Albumin more efficient",
+        ha="left",
+        va="center",
+        color="green",
+        transform=axes.transAxes,
+        fontsize=fontsize,
+    )
+    axes.text(
+        x_less,
+        0.95,
+        "Albumin less efficient➡",
+        ha="right",
+        va="center",
+        color="red",
+        transform=axes.transAxes,
+        fontsize=fontsize,
+    )
+    return axes

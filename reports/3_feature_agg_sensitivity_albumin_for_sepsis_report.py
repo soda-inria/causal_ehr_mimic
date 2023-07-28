@@ -6,7 +6,7 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 
 from caumim.constants import *
-from caumim.reports_utils import add_rct_gold_standard_line
+from caumim.reports_utils import add_albumin_label, add_rct_gold_standard_line
 
 # %%
 cohort_name = "sensitivity_feature_aggregation_albumin_for_sepsis__bs_50"
@@ -61,7 +61,7 @@ group_order = [NO_MODEL_GROUP_LABEL] + [
 # %%
 import forestplot as fp
 
-fp.forestplot(
+axes = fp.forestplot(
     results,  # the dataframe with resultcodes data
     estimate=RESULT_ATE,  # col containing estimated effect size
     ll=RESULT_ATE_LB,
@@ -79,6 +79,8 @@ fp.forestplot(
     ylabel="ATE (95% bootstrap confidence interval)",  # ylabel to print
     **{"marker": "D", "ylabel1_size": 10, "ylabel1_fontweight": "normal"},
 )
+axes = add_albumin_label(axes, x_less=1.18, fontsize=10)
+
 path2img = DIR2DOCS_IMG / cohort_name
 path2img.mkdir(exist_ok=True, parents=True)
 plt.savefig(path2img / f"{cohort_name}.pdf", bbox_inches="tight")

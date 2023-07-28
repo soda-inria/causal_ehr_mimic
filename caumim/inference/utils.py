@@ -26,16 +26,18 @@ def make_random_search_pipeline(
         scoring_ = "neg_brier_score"
     else:
         scoring_ = None
-    pipeline = RandomizedSearchCV(
-        Pipeline(pipeline_steps),
-        param_distributions=param_distributions,
-        random_state=random_state,
-        n_iter=n_iter,
-        n_jobs=-1,
-        scoring=scoring_,
-        # pre_dispatch=2,
-    )
-
+    if param_distributions is not None:
+        pipeline = RandomizedSearchCV(
+            Pipeline(pipeline_steps),
+            param_distributions=param_distributions,
+            random_state=random_state,
+            n_iter=n_iter,
+            n_jobs=-1,
+            scoring=scoring_,
+            # pre_dispatch=2,
+        )
+    else:
+        pipeline = Pipeline(pipeline_steps)
     return pipeline
 
 

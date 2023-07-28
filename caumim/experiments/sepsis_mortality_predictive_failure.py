@@ -21,7 +21,7 @@ from caumim.constants import (
     STAY_KEYS,
 )
 from copy import deepcopy
-from caumim.experiments.configurations import ESTIMATOR_HGB
+from caumim.experiments.configurations import ESTIMATOR_DUMMY, ESTIMATOR_HGB
 from caumim.experiments.utils import score_binary_classification
 from caumim.framing.albumin_for_sepsis import COHORT_CONFIG_ALBUMIN_FOR_SEPSIS
 
@@ -202,7 +202,10 @@ def train_predictive_failure_experiment(
             ],
         )
         outcome_pipeline.fit(train_X, train_Y)
-        outcome_best_pipeline = outcome_pipeline.best_estimator_
+        if hasattr(outcome_pipeline, "best_estimator_"):
+            outcome_best_pipeline = outcome_pipeline.best_estimator_
+        else:
+            outcome_best_pipeline = outcome_pipeline
         # evaluation
         # in-domain evaluation
         hat_y_val = outcome_best_pipeline.predict_proba(val_X)[:, 1]
@@ -239,9 +242,9 @@ if __name__ == "__main__":
         "observation_period_day": 1,
         "train_val_random_seeds": list(range(0, 10)),
         "experiment_name": "predictive_failure",
-        "post_treatment_features": False,
+        "post_treatment_features": True,
     }
-    estimator_config = ESTIMATOR_HGB
+    estimator_config = ESTIMATOR_DUMMY
 
     train_predictive_failure_experiment(
         cohort_config, experiment_config, estimator_config

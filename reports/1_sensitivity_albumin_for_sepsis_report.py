@@ -8,10 +8,10 @@ import matplotlib.pyplot as plt
 from caumim.constants import *
 from caumim.framing.albumin_for_sepsis import COHORT_CONFIG_ALBUMIN_FOR_SEPSIS
 from caumim.framing.utils import create_cohort_folder
-from caumim.reports_utils import add_rct_gold_standard_line
+from caumim.reports_utils import add_rct_gold_standard_line, add_albumin_label
 from copy import deepcopy
 
-IS_MAIN_FIGURE = True
+IS_MAIN_FIGURE = False
 # %%
 
 cohort_dir = create_cohort_folder(deepcopy(COHORT_CONFIG_ALBUMIN_FOR_SEPSIS))
@@ -111,9 +111,14 @@ axes = fp.forestplot(
 axes.set(xlim=(-0.15, 0.1))
 if IS_MAIN_FIGURE:
     outlier_x = 12
+    x_less = 1.15
+    fontsize = 7.5
 else:
     outlier_x = 20
-axes.text(0.1, outlier_x, "Outlier ▶", ha="left", va="center")
+    x_less = 1.05
+    fontsize = 10
+axes.text(0.1, outlier_x, "Outlier ▶", ha="right", va="center")
+axes = add_albumin_label(axes, x_less=x_less, fontsize=fontsize)
 
 path2img = DIR2DOCS_IMG / cohort_name
 

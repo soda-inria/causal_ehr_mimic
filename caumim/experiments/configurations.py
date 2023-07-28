@@ -1,5 +1,6 @@
 # pipelines
 import numpy as np
+from sklearn.dummy import DummyClassifier, DummyRegressor
 from sklearn.ensemble import (
     HistGradientBoostingClassifier,
     HistGradientBoostingRegressor,
@@ -50,4 +51,12 @@ ESTIMATOR_HGB = {
         "estimator__n_estimators": [10, 100, 200],
         "estimator__max_iter": [10, 50, 100],
     },
+}
+
+ESTIMATOR_DUMMY = {
+    "name": "Uniform random classifier",
+    "treatment_estimator": DummyClassifier(strategy="uniform", random_state=0),
+    "treatment_param_distributions": None,
+    "outcome_estimator": DummyRegressor(strategy="mean"),
+    "outcome_param_distributions": None,
 }
