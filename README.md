@@ -1,13 +1,17 @@
-# Causal analysis of EHRs to ground decision making: a tutorial on mimic-iv 
+# Step-by-step Causal Analysis Of Ehrs To Ground Decision Making
 
 
 ## Overview
 
-This code was used to study the effect of albumin+crystalloids compared to crystalloids only for sepsis patients on 28 day mortality in the Mimic-iv database. 
+This code was used to study the effect of a combination of Albumin+crystalloids compared to crystalloids only for sepsis patients on 28 day mortality in the Mimic-iv database. 
 
-## Data
+The corresponding paper is: 
 
-### Data acquisition
+```
+Step-by-step Causal Analysis Of Ehrs To Ground Decision Making, 
+```
+
+## Step 0: data acquisition
 
 0. We first built the data using postgresql following [mimic-code instructions](https://github.com/MIT-LCP/mimic-code/tree/main/mimic-iv/buildmimic/postgres) *=30min-1h*.
 1. We then used built the concepts from the [postgresql concepts scripts](https://github.com/MIT-LCP/mimic-code/tree/main/mimic-iv/concepts_postgres) *=1h-2h*.
@@ -16,3 +20,14 @@ This code was used to study the effect of albumin+crystalloids compared to cryst
 4. We convert all derived tables from postgresql to parquet using polars: `cli.mimiciv_derived2parquet` *=2min*.
 
 NB: Step 2 and 3 could be done from polars or duckdb directly from the csv, I think. But I had some bugs with the `pl.sink_parquet` when trying to convert the csv.
+
+**Computing setup:** The analysis was performed on a laptop running Ubuntu 22.04.2 LTS with the following hardware: CPU 12th Gen
+Intel(R) Core(TM) i7-1270P with 16 threads and 15 GB of RAM.
+
+## Step 1: study design – Frame the question to avoid biases
+
+## Estimate effects
+
+## Data
+
+
