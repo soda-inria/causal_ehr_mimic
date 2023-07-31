@@ -33,8 +33,8 @@ We used a combination of duckdb and postgresql to build mimic for a laptop into 
 
 ## Step 1: study design – Frame the question to avoid biases
 
- - Code for main paper: `caumim.framing.albumin_for_sepsis.py`
- - Step-by-step notebook: `notebooks/_1_framing_albumin_for_sepsis.py`
+ - Code for main paper: [`caumim.framing.albumin_for_sepsis.py`](https://github.com/soda-inria/causal_ehr_mimic/blob/main/caumim/framing/albumin_for_sepsis.py)
+ - Step-by-step notebook: [`notebooks/_1_framing_albumin_for_sepsis.py`](https://github.com/soda-inria/causal_ehr_mimic/blob/main/notebooks/_1_framing_albumin_for_sepsis.py)
 
 ## Step 2: identification – List necessary information to answer the causal question
 
@@ -44,18 +44,18 @@ The practical implementation of the selection of these covariates in MIMIC-IV is
 
 ## Step 3: Estimation – Compute the causal effect of interest
 
-- Code for main paper: `caumim.experiments.sensitivity_albumin_for_sepsis.py`
-- Step-by-step notebook: `notebooks/_3_estimation__albumin_for_sepsis.py`
+- Code for main paper: [`caumim.experiments.sensitivity_albumin_for_sepsis.py`](https://github.com/soda-inria/causal_ehr_mimic/blob/605a706f883b67459ec711de8eec387e8dd8528f/caumim/experiments/sensitivity_albumin_for_sepsis.py#L216)
+- Step-by-step notebook: [`notebooks/_3_estimation__albumin_for_sepsis.py`](https://github.com/soda-inria/causal_ehr_mimic/blob/605a706f883b67459ec711de8eec387e8dd8528f/notebooks/_3_estimation__albumin_for_sepsis.py#L141)
 
 ## Step 4: Vibration analysis – Assess the robustness of the hypotheses
 
 - Code for main paper: 
-  - Vibration analysis on immortal time bias: `caumim.experiments.immortal_time_bias_albumin_for_sepsis.py`
-  - Vibration analysis on feature aggregations: `caumim.experiments.sensitivity_feature_aggregation_albumin_for_sepsis.py`
-  - Vibration analysis on causal and statistical estimators: `caumim.experiments.sensitivity_albumin_for_sepsis.py`
+  - Vibration analysis on immortal time bias: [`caumim.experiments.immortal_time_bias_albumin_for_sepsis.py`](https://github.com/soda-inria/causal_ehr_mimic/blob/main/caumim/experiments/immortal_time_bias_albumin_for_sepis.py)
+  - Vibration analysis on feature aggregations: [`caumim.experiments.sensitivity_feature_aggregation_albumin_for_sepsis.py`](https://github.com/soda-inria/causal_ehr_mimic/blob/main/caumim/experiments/sensitivity_feature_aggregation_albumin_for_sepsis.py)
+  - Vibration analysis on causal and statistical estimators: [`caumim.experiments.sensitivity_albumin_for_sepsis.py`](https://github.com/soda-inria/causal_ehr_mimic/blob/main/caumim/experiments/sensitivity_albumin_for_sepsis.py)
 
-- Step-by-step notebook: `notebooks/_3_estimation__albumin_for_sepsis.py`
+- Step-by-step notebook: [`notebooks/_3_estimation__albumin_for_sepsis.py`](https://github.com/soda-inria/causal_ehr_mimic/blob/605a706f883b67459ec711de8eec387e8dd8528f/notebooks/_3_estimation__albumin_for_sepsis.py#L141)
 
 ## Step 5: Treatment heterogeneity – Compute treatment effects on subpopulations
 
-- Code for the main paper: `caumim.experiments.cate_exploration_albumin_for_sepsis.py`
+- Code for the main paper: [`caumim.experiments.cate_exploration_albumin_for_sepsis.py`](https://github.com/soda-inria/causal_ehr_mimic/blob/main/caumim/experiments/cate_exploration_albumin_for_sepsis.py)
