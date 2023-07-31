@@ -154,10 +154,10 @@ def add_leading_zero(x):
         return x
 
 
-def add_albumin_label(axes, fontsize=8, x_less=1.15, x_more=0):
+def add_albumin_label(axes, fontsize=8, x_less=1.15, x_more=0, y=0.95):
     axes.text(
         x_more,
-        0.95,
+        y,
         "⬅Albumin more efficient",
         ha="left",
         va="center",
@@ -167,7 +167,7 @@ def add_albumin_label(axes, fontsize=8, x_less=1.15, x_more=0):
     )
     axes.text(
         x_less,
-        0.95,
+        y,
         "Albumin less efficient➡",
         ha="right",
         va="center",

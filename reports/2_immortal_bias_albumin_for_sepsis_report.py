@@ -61,7 +61,11 @@ else:
             else x
         )
         + " + "
-        + results["treatment_model"]
+        + results["treatment_model"].map(
+            lambda x: ESTIMATORS2LABELS_SHORT[x]
+            if x in ESTIMATORS2LABELS_SHORT.keys()
+            else x
+        )
     )
     results["sortby"] = results["Group"]
     # .map(

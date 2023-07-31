@@ -1,0 +1,11 @@
+\begin{tabular}{llll}
+    \toprule
+    {}             & estimator              & nuisance  & Grid                                                                       \\
+    Estimator type &                        &           &                                                                            \\
+    \midrule
+    Linear         & LogisticRegression     & treatment & \{'C': logspace(-3, 2, 10)\}                                               \\
+    Linear         & Ridge                  & outcome   & \{'alpha': logspace(-3, 2, 10)\}                                           \\
+    Forest         & RandomForestClassifier & treatment & \{'n\_estimators': ['10', '100', '200'], 'max\_depth': ['3', '10', '50']\} \\
+    Forest         & RandomForestRegressor  & outcome   & \{'n\_estimators': ['10', '100', '200'], 'max\_depth': ['3', '10', '50']\} \\
+    \bottomrule
+\end{tabular}

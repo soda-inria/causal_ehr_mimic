@@ -32,7 +32,11 @@ results["label"] = (
     #     else x
     # )
     + ", Est="
-    + results["treatment_model"]
+    + results["treatment_model"].map(
+        lambda x: ESTIMATORS2LABELS_SHORT[x]
+        if x in ESTIMATORS2LABELS.keys()
+        else x
+    )
 )
 results.loc[mask_no_models, "label"] = results.loc[
     mask_no_models, "estimation_method"

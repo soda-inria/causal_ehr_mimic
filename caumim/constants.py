@@ -130,6 +130,9 @@ IDENTIFICATION2SHORT_LABELS = {
     "backdoor.propensity_score_weighting": "IPW",
 }
 
+ESTIMATORS2LABELS = {"Regularized LR": "Regularized Linear Model"}
+ESTIMATORS2LABELS_SHORT = {"Regularized LR": "Regularized Linear"}
+
 # HTE reports constants
 LABEL_CATE = "Predicted conditional treatment effect"
 COLORMAP = color_palette("tab20")

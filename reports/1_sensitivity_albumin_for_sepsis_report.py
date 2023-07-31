@@ -11,7 +11,7 @@ from caumim.framing.utils import create_cohort_folder
 from caumim.reports_utils import add_rct_gold_standard_line, add_albumin_label
 from copy import deepcopy
 
-IS_MAIN_FIGURE = False
+IS_MAIN_FIGURE = True
 # %%
 
 cohort_dir = create_cohort_folder(deepcopy(COHORT_CONFIG_ALBUMIN_FOR_SEPSIS))
@@ -45,7 +45,9 @@ compute_times = results[
     ["estimation_method", "compute_time", "outcome_model", "event_aggregations"]
 ].loc[~mask_no_models]
 if IS_MAIN_FIGURE:
-    results["label"] = "Est=" + results["treatment_model"]
+    results["label"] = "Est=" + results["treatment_model"].map(
+        lambda x: ESTIMATORS2LABELS[x] if x in ESTIMATORS2LABELS.keys() else x
+    )
 else:
     results["label"] = (
         "Agg="
@@ -59,7 +61,11 @@ else:
         #     else x
         # )
         + ", Est="
-        + results["treatment_model"]
+        + results["treatment_model"].map(
+            lambda x: ESTIMATORS2LABELS[x]
+            if x in ESTIMATORS2LABELS.keys()
+            else x
+        )
     )
 results.loc[mask_no_models, "label"] = results.loc[
     mask_no_models, "estimation_method"

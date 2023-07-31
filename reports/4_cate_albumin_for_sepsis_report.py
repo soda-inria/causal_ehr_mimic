@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 from caumim.constants import *
 import forestplot as fp
 
-from caumim.reports_utils import hist_plot_binary_treatment_hte
+from caumim.reports_utils import hist_plot_binary_treatment_hte, add_albumin_label
 %load_ext autoreload
 %autoreload 2
 
@@ -104,6 +104,7 @@ for model_final in ["Ridge", "RandomForestRegressor"]:
         else:
             ax.set(xlabel="Distribution of Individual Treatment Effect")
         ax.set(ylabel=cate_feature)
+    add_albumin_label(axes[0], x_less=1, x_more=0, y=1.15, fontsize=10)
     estimation_args_str  = f"est__{run_results['estimation_method']}__nuisances__{run_results['treatment_model']}__final_{model_final}"
     plt.savefig(path2img / f"boxplot_{estimation_args_str}.pdf", bbox_inches="tight")
     plt.savefig(path2img / f"boxplot_{estimation_args_str}.jpg", bbox_inches="tight")    
@@ -204,7 +205,7 @@ for cate_feature_name in ["X_cate__White","X_cate__Female","X_cate__admission_ag
         cate_results = pd.DataFrame({k: run_results[k] for k in result_columns})
         cate_results["X_cate__admission_age_bin"] = cate_results["X_cate__admission_age"].apply(lambda x: x>=age_group_thres)
 
-        fig, ax = hist_plot_binary_treatment_hte(
+        fig, ax = , add_albumin_label(
             cate_feature_name=cate_feature_name,
             target_set="cate_predictions",
             cate_results=cate_results,
