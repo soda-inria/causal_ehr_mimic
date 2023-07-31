@@ -13,22 +13,23 @@ Step-by-step Causal Analysis Of Ehrs To Ground Decision Making,
 
 ## Step 0: data acquisition
 
-    <details>
-        <summary>Different steps to reproduce data acquisition on a laptop</summary>
-        <br>
-            
-        0. We first built the data using postgresql following [mimic-code instructions](https://github.com/MIT-LCP/mimic-code/tree/main/mimic-iv/buildmimic/postgres) *=30min-1h*.
-        1. We then used built the concepts from the [postgresql concepts scripts](https://github.com/MIT-LCP/mimic-code/tree/main/mimic-iv/concepts_postgres) *=1h-2h*.
-        2. We built the original database with duckdb *=16min* following [mimic-code instructions](https://github.com/MIT-LCP/mimic-code/tree/main/mimic-iv/buildmimic/duckdb). This is done to copy the large files to parquet without memory overflow.
-        3. We convert all tables from the original database to parquet files using duckdb: `cli.duckdb2parquet` *=5min*.
-        4. We convert all derived tables from postgresql to parquet using polars: `cli.mimiciv_derived2parquet` *=2min*.
+We used a combination of duckdb and postgresql to build mimic for a laptop into parquet files easy to process during the analysis.
 
-        NB: Step 2 and 3 could be done from polars or duckdb directly from the csv, I think. But I had some bugs with the `pl.sink_parquet` when trying to convert the csv.
-
-        **Computing setup:** The analysis was performed on a laptop running Ubuntu 22.04.2 LTS with the following hardware: CPU 12th Gen
-        Intel(R) Core(TM) i7-1270P with 16 threads and 15 GB of RAM.
+<details>
+<summary>Steps to reproduce data acquisition on a laptop</summary>
         
-    </details>
+    0. We first built the data using postgresql following [mimic-code instructions](https://github.com/MIT-LCP/mimic-code/tree/main/mimic-iv/buildmimic/postgres) *=30min-1h*.
+    1. We then used built the concepts from the [postgresql concepts scripts](https://github.com/MIT-LCP/mimic-code/tree/main/mimic-iv/concepts_postgres) *=1h-2h*.
+    2. We built the original database with duckdb *=16min* following [mimic-code instructions](https://github.com/MIT-LCP/mimic-code/tree/main/mimic-iv/buildmimic/duckdb). This is done to copy the large files to parquet without memory overflow.
+    3. We convert all tables from the original database to parquet files using duckdb: `cli.duckdb2parquet` *=5min*.
+    4. We convert all derived tables from postgresql to parquet using polars: `cli.mimiciv_derived2parquet` *=2min*.
+
+    NB: Step 2 and 3 could be done from polars or duckdb directly from the csv, I think. But I had some bugs with the `pl.sink_parquet` when trying to convert the csv.
+
+    **Computing setup:** The analysis was performed on a laptop running Ubuntu 22.04.2 LTS with the following hardware: CPU 12th Gen
+    Intel(R) Core(TM) i7-1270P with 16 threads and 15 GB of RAM.
+    
+</details>
 
 ## Step 1: study design – Frame the question to avoid biases
 
