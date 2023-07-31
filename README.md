@@ -54,7 +54,7 @@ The practical implementation of the selection of these covariates in MIMIC-IV is
   - Vibration analysis on feature aggregations: [`caumim.experiments.sensitivity_feature_aggregation_albumin_for_sepsis.py`](https://github.com/soda-inria/causal_ehr_mimic/blob/main/caumim/experiments/sensitivity_feature_aggregation_albumin_for_sepsis.py)
   - Vibration analysis on causal and statistical estimators: [`caumim.experiments.sensitivity_albumin_for_sepsis.py`](https://github.com/soda-inria/causal_ehr_mimic/blob/main/caumim/experiments/sensitivity_albumin_for_sepsis.py)
 
-- Step-by-step notebook: [`notebooks/_3_estimation__albumin_for_sepsis.py`](https://github.com/soda-inria/causal_ehr_mimic/blob/605a706f883b67459ec711de8eec387e8dd8528f/notebooks/_3_estimation__albumin_for_sepsis.py#L141)
+- Step-by-step notebook: [`notebooks/_3_estimation__albumin_for_sepsis.py`](https://github.com/soda-inria/causal_ehr_mimic/blob/605a706f883b67459ec711de8eec387e8dd8528f/notebooks/_3_estimation__albumin_for_sepsis.py#L161)
 
 ## Step 5: Treatment heterogeneity – Compute treatment effects on subpopulations
 
