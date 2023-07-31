@@ -76,7 +76,7 @@ def run_sensitivity_experiment(config):
     else:
         dir_folder = DIR2EXPERIENCES / config.expe_name
     log_folder = dir_folder / "logs"
-    # 1 - Framing
+    # Step 1: study design – Frame the question to avoid biases
     target_trial_population = pl.read_parquet(
         cohort_folder / FILENAME_TARGET_POPULATION
     )
@@ -84,9 +84,8 @@ def run_sensitivity_experiment(config):
     target_trial_population = target_trial_population.sample(
         fraction=config["fraction"], shuffle=True, seed=config.random_state
     )
-    # 2 - Variable selection
-    # Static features
-    # demographics
+    # Step 2: identification – List necessary information to answer the causal question
+    # Static features: demographics
     target_trial_population = feature_emergency_at_admission(
         target_trial_population
     )
@@ -112,7 +111,8 @@ def run_sensitivity_experiment(config):
     ]
     outcome_name = config.outcome_name
 
-    # event features TODO: this is the only code specific to the albumin study.
+    # event features:
+    # TODO: this is the only code specific to the albumin study.
     # I could make it more generalizable by asking for a event_features function.
     event_features, feature_types = get_event_covariates_albumin_zhou(
         target_trial_population
@@ -150,7 +150,8 @@ def run_sensitivity_experiment(config):
     logger.info(
         f"{len(runs_to_be_launch)} configs to run :\n {runs_to_be_launch}\n------"
     )
-
+    # Step 4: Vibration analysis – Assess the robustness of the hypotheses
+    # Loop on various feature aggregations, causal and statistical estimators
     for run_config in runs_to_be_launch:
         t0 = datetime.now()
         logger.info(f"Running {run_config}")
@@ -212,7 +213,7 @@ def run_sensitivity_experiment(config):
         X[colnames_binary_features] = X[colnames_binary_features].fillna(
             value=0
         )
-        # 3 - Identification and estimation
+        # Step 3: Estimation – Compute the causal effect of interest
         column_transformer = make_column_transformer(
             numerical_features=colnames_numerical_features,
             categorical_features=colnames_categorical_features,
