@@ -40,7 +40,8 @@ We used a combination of duckdb and postgresql to build mimic for a laptop into 
 
 We built the causal graph with a clinician, using the online graphical tool [Daggity](https://dagitty.net/).
 
-The practical implementation of the selection of these covariates in MIMIC-IV is done with the `get_event_covariates_albumin_zhou` function in `caumim.variables.selection.py`
+The practical implementation of the selection of these covariates in MIMIC-IV is done with the [`get_event_covariates_albumin_zhou`](https://github.com/soda-inria/causal_ehr_mimic/blob/06a65e94c221bd02d1613477937b281543b05577/caumim/variables/selection.py#L107) function in `caumim.variables.selection.py`
+
 ## Step 3: Estimation – Compute the causal effect of interest
 
 - Code for main paper: `caumim.experiments.sensitivity_albumin_for_sepsis.py`
@@ -49,9 +50,9 @@ The practical implementation of the selection of these covariates in MIMIC-IV is
 ## Step 4: Vibration analysis – Assess the robustness of the hypotheses
 
 - Code for main paper: 
-  - Vibration analysis on causal and statistical estimators: `caumim.experiments.sensitivity_albumin_for_sepsis.py`
   - Vibration analysis on immortal time bias: `caumim.experiments.immortal_time_bias_albumin_for_sepsis.py`
-  - Vibration analysis on causal and statistical estimators: `caumim.experiments.sensitivity_feature_aggregation_albumin_for_sepsis.py`
+  - Vibration analysis on feature aggregations: `caumim.experiments.sensitivity_feature_aggregation_albumin_for_sepsis.py`
+  - Vibration analysis on causal and statistical estimators: `caumim.experiments.sensitivity_albumin_for_sepsis.py`
 
 - Step-by-step notebook: `notebooks/_3_estimation__albumin_for_sepsis.py`
 

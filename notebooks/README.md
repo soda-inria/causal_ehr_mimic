@@ -4,9 +4,11 @@
 The following notebooks implement our causal framework in a step-by-step fashion for didactic purpose for the targeted trial estimating the effect of *Albumin+crystalloids comapred to crystalloids only for sespis patients*:
 
 - `_1_framing_albumin_for_sepsis.py`: Build the PICO(T) components for the targeted trial (Population, Intervention, Comparator, Outcome, Time).
-- `_2_estimation__albumin_for_sepsis.py`: Illustrate how to perform the estimation step with different causal and statistical models.
+- The function[`get_event_covariates_albumin_zhou`](https://github.com/soda-inria/causal_ehr_mimic/blob/06a65e94c221bd02d1613477937b281543b05577/caumim/variables/selection.py#L107) function in `caumim.variables.selection.py` implements in MIMIC-IV the selection of the confounders obtained during the identification step with the causal graph.
 
-*NB:* The analyses of the paper were conducted with dedicated scripts present in `caumim.experiments`
+- `_3_estimation__albumin_for_sepsis.py`: Perform the estimation step with various causal and statistical models.
+
+*NB:* The analyses of the paper were conducted with dedicated scripts present in `caumim.experiments`.
 
 # Target trials proposal suitable to be replicated in MIMIC
 
