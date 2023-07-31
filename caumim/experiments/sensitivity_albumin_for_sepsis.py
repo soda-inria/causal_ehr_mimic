@@ -12,8 +12,6 @@ from sklearn.calibration import cross_val_predict
 from sklearn.model_selection import ParameterGrid, RandomizedSearchCV
 from sklearn.utils import Bunch
 from caumim.constants import *
-from caumim.framing.albumin_for_sepsis import COHORT_CONFIG_ALBUMIN_FOR_SEPSIS
-from caumim.framing.utils import create_cohort_folder
 from caumim.experiments.configurations import ESTIMATOR_RIDGE, ESTIMATOR_RF
 from caumim.experiments.utils import (
     InferenceWrapper,
@@ -30,8 +28,6 @@ from caumim.variables.utils import (
 )
 from caumim.experiments.utils import log_estimate
 
-from dowhy import CausalModel
-from sklearn.pipeline import Pipeline, make_pipeline
 from zepid import RiskDifference
 
 
@@ -50,11 +46,11 @@ sensitivity_config = Bunch(
                 # {"last": pl.col(COLNAME_VALUE).last()},
             ],
             "estimation_method": [
-                "LinearDML",
+                "DML",
                 "backdoor.propensity_score_matching",
                 "backdoor.propensity_score_weighting",
                 "TLearner",
-                "LinearDRLearner",
+                "DRLearner",
                 # "CausalForest",
             ],
             "estimator": [ESTIMATOR_RIDGE],  # ESTIMATOR_RF

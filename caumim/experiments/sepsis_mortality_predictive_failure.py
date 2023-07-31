@@ -2,10 +2,7 @@
 from datetime import datetime
 import pandas as pd
 import polars as pl
-from sklearn.ensemble import (
-    HistGradientBoostingClassifier,
-    RandomForestClassifier,
-)
+
 from sklearn.model_selection import cross_validate, train_test_split
 from caumim.constants import (
     COLNAME_CODE,

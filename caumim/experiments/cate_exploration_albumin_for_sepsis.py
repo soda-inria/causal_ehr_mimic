@@ -24,8 +24,7 @@ from sklearn.model_selection import (
     train_test_split,
 )
 from caumim.constants import *
-from caumim.framing.albumin_for_sepsis import COHORT_CONFIG_ALBUMIN_FOR_SEPSIS
-from caumim.framing.utils import create_cohort_folder
+
 from caumim.experiments.configurations import ESTIMATOR_RIDGE, ESTIMATOR_RF
 from caumim.experiments.utils import (
     InferenceWrapper,
@@ -65,7 +64,7 @@ cate_config = CateConfig(
         ],
         "estimation_method": [
             "DML"
-            # "LinearDRLearner",
+            # "DRLearner",
             # "CausalForest",
         ],
         "estimator": [ESTIMATOR_RF],

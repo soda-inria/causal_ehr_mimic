@@ -22,8 +22,8 @@ immortal_time_bias_config = Bunch(
                 },
             ],
             "estimation_method": [
-                "LinearDML",
-                "LinearDRLearner",
+                "DML",
+                "DRLearner",
                 "backdoor.propensity_score_weighting",
             ],
             "estimator": [ESTIMATOR_RIDGE, ESTIMATOR_RF],

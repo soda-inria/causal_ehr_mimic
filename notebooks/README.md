@@ -3,8 +3,8 @@
 
 The following notebooks implement our causal framework in a step-by-step fashion for didactic purpose for the targeted trial estimating the effect of *Albumin+crystalloids comapred to crystalloids only for sespis patients*:
 
-- `_1_framing_albumine_for_sepsis.py`: Build the PICO(T) components for the targeted trial (Population, Intervention, Comparator, Outcome, Time).
-- `_2_estimation__albumine_for_sepsis.py`: Illustrate how to perform the estimation step with different causal and statistical models.
+- `_1_framing_albumin_for_sepsis.py`: Build the PICO(T) components for the targeted trial (Population, Intervention, Comparator, Outcome, Time).
+- `_2_estimation__albumin_for_sepsis.py`: Illustrate how to perform the estimation step with different causal and statistical models.
 
 *NB:* The analyses of the paper were conducted with dedicated scripts present in `caumim.experiments`
 

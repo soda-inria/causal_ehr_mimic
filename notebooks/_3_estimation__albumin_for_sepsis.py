@@ -26,8 +26,6 @@ from sklearn.linear_model import LassoCV, LogisticRegression, Ridge
 from sklearn.model_selection import RandomizedSearchCV
 
 from dowhy import CausalModel
-from caumim.inference.estimation import AteEstimator, CateEstimator
-
 # %%
 # 1 - Framing
 cohort_folder = create_cohort_folder(COHORT_CONFIG_ALBUMIN_FOR_SEPSIS)
