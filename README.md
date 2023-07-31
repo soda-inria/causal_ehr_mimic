@@ -40,6 +40,7 @@ We used a combination of duckdb and postgresql to build mimic for a laptop into 
 
 We built the causal graph with a clinician, using the online graphical tool [Daggity](https://dagitty.net/).
 
+The practical implementation of the selection of these covariates in MIMIC-IV is done with the `get_event_covariates_albumin_zhou` function in `caumim.variables.selection.py`
 ## Step 3: Estimation – Compute the causal effect of interest
 
 - Code for main paper: `caumim.experiments.sensitivity_albumin_for_sepsis.py`

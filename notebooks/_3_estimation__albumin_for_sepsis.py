@@ -26,18 +26,21 @@ from sklearn.linear_model import LassoCV, LogisticRegression, Ridge
 from sklearn.model_selection import RandomizedSearchCV
 
 from dowhy import CausalModel
+
+# %% [markdown]
+# # Step 1: study design – Frame the question to avoid biases
+# Detailed in `notebooks/_1_framing_albumin_for_sepsis.py`
 # %%
-# 1 - Framing
 cohort_folder = create_cohort_folder(COHORT_CONFIG_ALBUMIN_FOR_SEPSIS)
 target_trial_population = pl.read_parquet(
     cohort_folder / FILENAME_TARGET_POPULATION
 )
 target_trial_population.head()
-# %%
-# 2 - Variable selection
+# %% [markdown]
+# # Step 2: identification – List necessary information to answer the causal question
 
-# Static features
-# demographics
+# ## Static features: demographics
+# %%
 target_trial_population = feature_emergency_at_admission(
     target_trial_population
 )
@@ -62,12 +65,12 @@ static_features = [
     COLNAME_INSURANCE_MEDICARE,
 ]
 outcome_name = COLNAME_MORTALITY_28D
+# %% [markdown]
+# ## Event features and choices of aggregation
 # %%
-# event features
 event_features, feature_types = get_event_covariates_albumin_zhou(
     target_trial_population
 )
-
 
 # %%
 aggregate_functions = {
@@ -130,20 +133,39 @@ transformed_features_preview = pd.DataFrame(
     columns=column_transformer_preview.get_feature_names_out(),
 )
 transformed_features_preview.head()
-# %% [markdown] Are we happy with the features preprocessing ? Note that the
+# %% [markdown]
+# Are we happy with the features preprocessing ? Note that the
 # column_transformer should be apply in a sklearn.pipeline for the treatment or
 # the outcome models in order to avoid information leakage.
 
-# 3 - Identification and Estimation
+# # Step 3: Estimation – Compute the causal effect of interest
+# ### Naive Difference in Means estimate (unajusted)
 
-## Let's take an identification and an estimation method
+# The bound returned are the worst cases scenario from the [Fréchet-Boole
+# inequalities](http://causality.cs.ucla.edu/blog/index.php/2019/11/05/frechet-inequalities/).
+# Any estimator having larger bound than the naive DM estimator should not be
+# reliable.
+# %%
+from zepid import RiskDifference
+
+dm = RiskDifference()
+dm.fit(X_list, COLNAME_INTERVENTION_STATUS, outcome_name)
+dm_results = {
+    RESULT_ATE: dm.results.RiskDifference[1],
+    RESULT_ATE_LB: dm.results.LowerBound[1],
+    RESULT_ATE_UB: dm.results.UpperBound[1],
+}
+dm_results
+# %% [markdown]
+# Now let's take one causal and statistical estimator to try to adjust for confounding.
 # To keep it simple, we will use a regularized logistic/linear regressions for both
-# the treatment and outcome models, and will vary the identification methods.
+# the treatment and outcome models, and will vary the causal estimators to see how it affect the results.
 # %%
 from caumim.experiments.configurations import ESTIMATOR_RIDGE, ESTIMATOR_RF
 
 estimator = ESTIMATOR_RIDGE
-# %% [markdown] Because, there is some hyper-parameters to choose, we will use a
+# %% [markdown]
+# Because, there is some hyper-parameters to choose, we will use a
 # random search to find the best hyper-parameters for our dataset, as
 # recommended by [Bouthillier et al., 2021](https://arxiv.org/pdf/2103.03098.pdf). Then, for the
 # different identification methods, we will reuse these hyper-parameters to fit
@@ -169,8 +191,9 @@ treatment_pipeline.fit(X_list, a)
 treatment_estimator_w_best_HP = treatment_pipeline.best_estimator_
 outcome_pipeline.fit(X_list, y)
 outcome_estimator_w_best_HP = outcome_pipeline.best_estimator_
-# %%
+# %% [markdown]
 # ### G-computation with T-learner
+# %%
 from econml.metalearners import TLearner
 from econml.inference import BootstrapInference
 
@@ -225,7 +248,7 @@ results[RESULT_ATE_LB], results[RESULT_ATE_UB] = ate_inference.conf_int_mean()
 results
 
 # %% [markdown]
-## With dowhy
+# ### IPW with dowhy
 
 # I find the package a bit too complicated if we are solely interested in ate
 # estimation, but it implements a IPW out of box (which could overfit though because not fitted by crossvaldaito).
@@ -262,7 +285,7 @@ results[RESULT_ATE_LB] = lower_bound
 results[RESULT_ATE_UB] = upper_bound
 results
 # %%
-# Use a Causal Forest
+# ### Causal Forest
 from econml.grf import CausalForest
 
 transformed_data = column_transformer.fit_transform(
@@ -287,8 +310,9 @@ results[RESULT_ATE] = ate_point_estimates.mean()
 results[RESULT_ATE_LB] = lb_point_estimates.mean()
 results[RESULT_ATE_UB] = ub_point_estimates.mean()
 results
+# %% [markdown]
+# ### Double Machine Learning (R-Learner)
 # %%
-# Ortho-learner
 from econml.dml import LinearDML
 
 dml_learner = LinearDML(
@@ -311,27 +335,11 @@ results[RESULT_ATE] = ate_inference.mean_point
 results[RESULT_ATE_LB], results[RESULT_ATE_UB] = ate_inference.conf_int_mean()
 results
 
-# %%
-# Naive DM estimate:
-from zepid import RiskDifference
-
-# The bound returned are the worst cases scenario from the [Fréchet-Boole
-# inequalities](http://causality.cs.ucla.edu/blog/index.php/2019/11/05/frechet-inequalities/).
-# Any estimator having larger bound than the naive DM estimator should not be
-# reliable.
-dm = RiskDifference()
-dm.fit(X_list, COLNAME_INTERVENTION_STATUS, outcome_name)
-dm_results = {
-    RESULT_ATE: dm.results.RiskDifference[1],
-    RESULT_ATE_LB: dm.results.LowerBound[1],
-    RESULT_ATE_UB: dm.results.UpperBound[1],
-}
-dm_results
 
 # %% [markdown]
-# Check assumptions
+# # Check causal assumptions
 
-## Graphical assessment
+# ## Graphical assessment
 # %%
 hat_e = cross_val_predict(
     estimator=treatment_estimator_w_best_HP,

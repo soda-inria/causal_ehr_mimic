@@ -107,10 +107,12 @@ def get_comorbidity(
 def get_event_covariates_albumin_zhou(
     target_trial_population: pl.DataFrame,
 ) -> Tuple[pl.DataFrame, VariableTypes]:
-    """Get the baseline variables from the [Zhou et al., 2021](https://link.springer.com/article/10.1186/s13613-021-00830-8) paper.
+    """Get the baseline variables from the [Zhou et al.,2021](https://link.springer.com/article/10.1186/s13613-021-00830-8)
+    paper.
 
     Returns:
-        pl.DataFrame: Events in the observation period (before followup), for the target trial population.
+        pl.DataFrame: Events in the observation period (before followup), for
+        the target trial population.
     """
     # Describe baseline caracteristics
     event_list = []

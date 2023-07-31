@@ -25,12 +25,16 @@ print(tables)
 cohort_config = Bunch(**COHORT_CONFIG_ALBUMIN_FOR_SEPSIS)
 print(cohort_config)
 create_cohort_folder(cohort_config)
-# %%
-# 1 - Define the inclusion events, ie. the event that defines when a patient
-# enter the cohort.
+# %% [markdown] 
+# # Step 1: study design – Frame the question to avoid biases
+# 
+# Define all PICO(T) components
 
-# Inclusion start: First administration of crystalloids during the 24 first
+# ## 1. Define when the inclusion start (Time component)
+# 
+#  First administration of crystalloids during the 24 first
 # hours of ICU stay
+# %%
 input_events = pl.scan_parquet(DIR2MIMIC / "mimiciv_icu.inputevents/*")
 icu_stays = pl.scan_parquet(DIR2MIMIC/ "mimiciv_icu.icustays/*")
 # full list of crystalloids taken from :https://www.ncbi.nlm.nih.gov/books/NBK537326/
@@ -66,6 +70,8 @@ first_crystalloids["delta_crystalloids_icu_intime"] = (
 inclusion_event = first_crystalloids.loc[
     first_crystalloids["delta_crystalloids_icu_intime"].dt.days == 0
 ]
+# %% [markdown]
+# ## 2. Define the population component 
 # %%
 base_population = get_base_population(
     min_age=cohort_config.min_age,
@@ -83,8 +89,9 @@ inclusion_criteria = {
 target_population, inclusion_counts = roll_inclusion_criteria(inclusion_criteria)
 target_population.head(3)
 
+# %% [markdown]
+# 3. Define the treatment events (Intervention component)  
 # %%
-# 3 - Define the treatment events  
 albumin_itemids = [
     # 220861, #"Albumin (Human) 20% Not in use
     220862, #Albumin 25%,Albumin 25%
@@ -114,8 +121,9 @@ first_albumin_in24h = first_albumin_in24h.loc[
     first_albumin_in24h[COLNAME_INTERVENTION_START] > first_albumin_in24h[COLNAME_INCLUSION_START]
 ]
 first_albumin_in24h
+# %% [markdown]
+# 4. Define treatment and control population (Intervention/Control components)
 # %%
-# 4- Define treatment and control population:
 target_trial_population = target_population.merge(
     first_albumin_in24h[["stay_id", COLNAME_INTERVENTION_START]].drop_duplicates(), on="stay_id", how="left")
 
@@ -123,12 +131,11 @@ target_trial_population[COLNAME_INTERVENTION_STATUS] = target_trial_population[C
 
 print("Number of treated patients (sepsis3 and crystalloids/albumin combination) in 24h:", target_trial_population[COLNAME_INTERVENTION_STATUS].sum())
 print("Number of control patients (sepsis3 and crystalloids only in 24h:", (1 - target_trial_population[COLNAME_INTERVENTION_STATUS]).sum())
+# %% [markdown]
+# 5. Define outcomes (Outcome component)
 # %%
-# 5 - Define outcomes
 cohort_folder = create_cohort_folder(cohort_config)
 target_trial_population = pd.read_parquet(cohort_folder/"target_population")
-
-# 5 - Define outcomes
 # 28-days and 90-days mortality
 mask_dod = target_trial_population["dod"].notnull()
 days_to_death = (
