@@ -37,6 +37,7 @@ from caumim.variables.utils import (
 """This script compares the performances of a predictive model trained on the
 features of the whole observation period to the performances of the same model
 evaluated only on features available before treatment.
+It corresponds to the motivational example of the paper.
 """
 
 

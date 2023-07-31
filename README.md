@@ -47,7 +47,11 @@ We built the causal graph with a clinician, using the online graphical tool [Dag
 
 ## Step 4: Vibration analysis – Assess the robustness of the hypotheses
 
-- Code for main paper: `caumim.experiments.sensitivity_albumin_for_sepsis.py`
+- Code for main paper: 
+  - Vibration analysis on causal and statistical estimators: `caumim.experiments.sensitivity_albumin_for_sepsis.py`
+  - Vibration analysis on immortal time bias: `caumim.experiments.immortal_time_bias_albumin_for_sepsis.py`
+  - Vibration analysis on causal and statistical estimators: `caumim.experiments.sensitivity_feature_aggregation_albumin_for_sepsis.py`
+
 - Step-by-step notebook: `notebooks/_3_estimation__albumin_for_sepsis.py`
 
 ## Step 5: Treatment heterogeneity – Compute treatment effects on subpopulations
