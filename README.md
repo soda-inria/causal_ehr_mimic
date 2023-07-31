@@ -33,8 +33,23 @@ We used a combination of duckdb and postgresql to build mimic for a laptop into 
 
 ## Step 1: study design – Frame the question to avoid biases
 
-## Estimate effects
+ - Code for main paper: `caumim.framing.albumin_for_sepsis.py`
+ - Step-by-step notebook: `notebooks/_1_framing_albumin_for_sepsis.py`
 
-## Data
+## Step 2: identification – List necessary information to answer the causal question
 
+We build the causal graph with a clinician, using the online graphical tool [Daggity](https://dagitty.net/).
 
+## Step 3: Estimation – Compute the causal effect of interest
+
+    - Code for main paper: `caumim.estimation.albumin_for_sepsis.py`
+    - Step-by-step notebook: `notebooks/_2_estimation_albumin_for_sepsis.py`
+
+## Step 4: vibration analysis – assess the robustness of the hypotheses
+
+    - Code for main paper: `caumim.vibration.albumin_for_sepsis.py`
+    - Step-by-step notebook: `notebooks/_3_vibration_albumin_for_sepsis.py`
+
+## Step 5: Treatment heterogeneity – Compute treatment effects on subpopulations
+
+- Code for the main paper: `caumim.experiments.cate_exploration_albumin_for_sepsis.py`
