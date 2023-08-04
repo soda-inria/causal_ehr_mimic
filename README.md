@@ -8,10 +8,7 @@ This code was used to study the effect of a combination of Albumin+crystalloids 
 The corresponding paper is: 
 
 ```
-[Causal thinking for decision making on Electronic Health Records: why and
-how, Doutreligne M. and Struja T. and Abecassis J. and
-Morgand C. and Celi L. and Varoquaux G., arXiv preprint
-arXiv:2308.01605, 2023](https://arxiv.org/abs/2308.01605)
+[Causal thinking for decision making on Electronic Health Records: why and how, Doutreligne M. and Struja T. and Abecassis J. and Morgand C. and Celi L. and Varoquaux G., arXiv preprint arXiv:2308.01605, 2023](https://arxiv.org/abs/2308.01605)
 ```
 
 ## Step 0: data acquisition
