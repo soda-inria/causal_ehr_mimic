@@ -74,6 +74,7 @@ def add_rct_gold_standard_line(
                     RESULT_ATE_LB: [gold_standard_lb],
                     RESULT_ATE_UB: [gold_standard_ub],
                     "observation_period": "24h",
+                    "feature_subset": "None",
                 },
             ),
             results,
