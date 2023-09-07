@@ -7,8 +7,10 @@ from sklearn.utils import Bunch
 from caumim.constants import (
     COLNAME_CODE,
     COLNAME_DOMAIN,
+    COLNAME_EMERGENCY_ADMISSION,
     COLNAME_END,
     COLNAME_HADM_ID,
+    COLNAME_INSURANCE_MEDICARE,
     COLNAME_PATIENT_ID,
     COLNAME_START,
     COLNAMES_EVENTS,
@@ -30,6 +32,70 @@ from joblib import Memory
 
 location = "./cachedir"
 memory = Memory(location, verbose=0)
+
+
+FEATURES_DRUGS = [
+    "Carbapenems",
+    "Aminoglycosides",
+    "Beta-lactams",
+    "Glycopeptide",
+    "vasopressors",
+]
+
+FEATURES_MEASUREMENTS = [
+    "Weight",
+    "lactate",
+    "heart_rate",
+    "spo2",
+    "mbp",
+    "urineoutput",
+    "temperature",
+    "aki_stage",
+    "SAPSII",
+    "resp_rate",
+    "SOFA",
+]
+
+FEATURES_PROCEDURES = ["RRT", "ventilation"]
+FEATURES_OBS = ["suspected_infection_blood"]
+
+FEATURE_DEMOGRAPHICS = [
+    "admission_age",
+    "Female",
+    COLNAME_EMERGENCY_ADMISSION,
+    COLNAME_INSURANCE_MEDICARE,
+    "White",
+]
+LABEL_ALL_FEATURES = "All confounders"
+LABEL_DEMOGRAPHICS = "Socio-demographics"
+LABEL_WO_DRUGS = "Without drugs"
+LABEL_WO_MEASUREMENTS = "Without measurements"
+LABEL_WO_MEASUREMENTS_AND_DRUGS = "Without measurements and drugs"
+FEATURE_SETS = {
+    LABEL_ALL_FEATURES: (
+        FEATURE_DEMOGRAPHICS
+        + FEATURES_DRUGS
+        + FEATURES_MEASUREMENTS
+        + FEATURES_PROCEDURES
+        + FEATURES_OBS
+    ),
+    LABEL_WO_DRUGS: (
+        FEATURE_DEMOGRAPHICS
+        + FEATURES_MEASUREMENTS
+        + FEATURES_PROCEDURES
+        + FEATURES_OBS
+    ),
+    LABEL_WO_MEASUREMENTS: (
+        FEATURE_DEMOGRAPHICS
+        + FEATURES_DRUGS
+        + FEATURES_PROCEDURES
+        + FEATURES_OBS
+    ),
+    LABEL_WO_MEASUREMENTS_AND_DRUGS: (
+        FEATURE_DEMOGRAPHICS + FEATURES_PROCEDURES + FEATURES_OBS
+    ),
+    LABEL_DEMOGRAPHICS: FEATURE_DEMOGRAPHICS,
+}
 
 
 @dataclass

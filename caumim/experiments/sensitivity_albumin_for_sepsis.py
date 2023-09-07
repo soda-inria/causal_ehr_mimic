@@ -21,7 +21,12 @@ from caumim.experiments.utils import (
 from caumim.inference.scores import normalized_total_variation
 from caumim.inference.utils import make_random_search_pipeline
 
-from caumim.variables.selection import get_event_covariates_albumin_zhou
+from caumim.variables.selection import (
+    get_event_covariates_albumin_zhou,
+    FEATURE_DEMOGRAPHICS,
+    FEATURE_SETS,
+    LABEL_DEMOGRAPHICS,
+)
 from caumim.variables.utils import (
     feature_emergency_at_admission,
     feature_insurance_medicare,
@@ -60,6 +65,8 @@ sensitivity_config = Bunch(
         "bootstrap_num_samples": 50,
     }
 )
+
+ALL_FEATURES = []
 
 
 def run_sensitivity_experiment(config):
@@ -103,12 +110,7 @@ def run_sensitivity_experiment(config):
             .alias("White"),
         ]
     )
-    static_features = [
-        "admission_age",
-        "Female",
-        COLNAME_EMERGENCY_ADMISSION,
-        COLNAME_INSURANCE_MEDICARE,
-    ]
+
     outcome_name = config.outcome_name
 
     # event features:
@@ -121,6 +123,9 @@ def run_sensitivity_experiment(config):
         "event_aggregations": config.experience_grid_dict["event_aggregations"],
         "estimation_method": config.experience_grid_dict["estimation_method"],
         "estimator": config.experience_grid_dict["estimator"],
+        "feature_subset": config.experience_grid_dict.get(
+            "feature_subset", FEATURE_SETS["All confounders"]
+        ),
     }
     runs_to_be_launch = list(ParameterGrid(experience_grid_dict))
 
@@ -155,64 +160,88 @@ def run_sensitivity_experiment(config):
     for run_config in runs_to_be_launch:
         t0 = datetime.now()
         logger.info(f"Running {run_config}")
-        # Variable aggregation
+        # Confounder selection
+        feature_subset_name = run_config["feature_subset"]
+        feature_subset = FEATURE_SETS[feature_subset_name]
         aggregate_functions = {
             k: v.alias(k) for k, v in run_config["event_aggregations"].items()
         }
         aggregation_names = list(aggregate_functions.keys())
-        patient_features_aggregated = (
-            event_features.sort([COLNAME_PATIENT_ID, COLNAME_START])
-            .groupby(STAY_KEYS + [COLNAME_CODE])
-            .agg(list(aggregate_functions.values()))
-        ).pivot(
-            index=STAY_KEYS,
-            columns=COLNAME_CODE,
-            values=aggregation_names,
-            aggregate_function=None,
-        )
-        # particular case when there is only one aggregation function
-        if len(aggregate_functions) == 1:
-            patient_features_aggregated.columns = [
-                f"{aggregation_names[0]}_code_{col}"
-                if col not in STAY_KEYS
-                else col
-                for col in patient_features_aggregated.columns
+        if feature_subset_name != LABEL_DEMOGRAPHICS:
+            event_features_subset = event_features.filter(
+                pl.col("code").is_in(feature_subset)
+            )
+            # Variable aggregation
+            patient_features_aggregated = (
+                event_features_subset.sort([COLNAME_PATIENT_ID, COLNAME_START])
+                .groupby(STAY_KEYS + [COLNAME_CODE])
+                .agg(list(aggregate_functions.values()))
+            ).pivot(
+                index=STAY_KEYS,
+                columns=COLNAME_CODE,
+                values=aggregation_names,
+                aggregate_function=None,
+            )
+            # particular case when there is only one aggregation function
+            if len(aggregate_functions) == 1:
+                patient_features_aggregated.columns = [
+                    f"{aggregation_names[0]}_code_{col}"
+                    if col not in STAY_KEYS
+                    else col
+                    for col in patient_features_aggregated.columns
+                ]
+
+            event_features_names = list(
+                set(patient_features_aggregated.columns).difference(
+                    set(STAY_KEYS)
+                )
+            )
+            X = patient_features_aggregated.join(
+                target_trial_population,
+                on=STAY_KEYS,
+                how="inner",
+            )[
+                [
+                    *event_features_names,
+                    *FEATURE_DEMOGRAPHICS,
+                    COLNAME_INTERVENTION_STATUS,
+                    outcome_name,
+                ]
+            ].to_pandas()
+
+            # COLUMN TRANSFORMERS
+            colnames_binary_features = [
+                f"{agg_name_}_code_{col}"
+                for agg_name_ in aggregation_names
+                for col in feature_types.binary_features
+                if col in feature_subset
             ]
 
-        event_features_names = list(
-            set(patient_features_aggregated.columns).difference(set(STAY_KEYS))
-        )
-        X = patient_features_aggregated.join(
-            target_trial_population,
-            on=STAY_KEYS,
-            how="inner",
-        )[
-            [
-                *event_features_names,
-                *static_features,
-                COLNAME_INTERVENTION_STATUS,
-                outcome_name,
+            colnames_numerical_features = [
+                f"{agg_name_}_code_{col}"
+                for agg_name_ in aggregation_names
+                for col in feature_types.numerical_features
+                if col in feature_subset
             ]
-        ].to_pandas()
-        colnames_binary_features = [
-            f"{agg_name_}_code_{col}"
-            for agg_name_ in aggregation_names
-            for col in feature_types.binary_features
-        ]
-
-        colnames_numerical_features = [
-            f"{agg_name_}_code_{col}"
-            for agg_name_ in aggregation_names
-            for col in feature_types.numerical_features
-        ]
-        colnames_categorical_features = [
-            f"{agg_name_}_code_{col}"
-            for agg_name_ in aggregation_names
-            for col in feature_types.categorical_features
-        ]
-        X[colnames_binary_features] = X[colnames_binary_features].fillna(
-            value=0
-        )
+            colnames_categorical_features = [
+                f"{agg_name_}_code_{col}"
+                for agg_name_ in aggregation_names
+                for col in feature_types.categorical_features
+                if col in feature_subset
+            ]
+            X[colnames_binary_features] = X[colnames_binary_features].fillna(
+                value=0
+            )
+        else:
+            X = target_trial_population[
+                [
+                    *FEATURE_DEMOGRAPHICS,
+                    COLNAME_INTERVENTION_STATUS,
+                    outcome_name,
+                ]
+            ].to_pandas()
+            colnames_numerical_features = []
+            colnames_categorical_features = []
         # Step 3: Estimation – Compute the causal effect of interest
         column_transformer = make_column_transformer(
             numerical_features=colnames_numerical_features,
@@ -318,6 +347,7 @@ def run_sensitivity_experiment(config):
         results["compute_time"] = (datetime.now() - t0).total_seconds()
         results["cohort_name"] = cohort_folder.name
         results["outcome_name"] = outcome_name
+        results["feature_subset"] = feature_subset_name
 
         log_estimate(results, log_folder)
 
