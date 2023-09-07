@@ -149,6 +149,7 @@ def run_sensitivity_experiment(config):
         "compute_time": (datetime.now() - t0).total_seconds(),
         "cohort_name": cohort_folder.name,
         "outcome_name": outcome_name,
+        "feature_subset": "None",
     }
     log_estimate(estimate_difference_in_mean, cohort_folder / log_folder)
 

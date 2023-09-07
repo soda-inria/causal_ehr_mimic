@@ -32,10 +32,13 @@ confounders_config = Bunch(
             ],
             "estimation_method": [
                 "DML",
-                "DRLearner",
-                "backdoor.propensity_score_weighting",
+                # "DRLearner",
+                # "backdoor.propensity_score_weighting",
             ],
-            "estimator": [ESTIMATOR_RIDGE, ESTIMATOR_RF],
+            "estimator": [
+                # ESTIMATOR_RIDGE,
+                ESTIMATOR_RF
+            ],
             "feature_subset": [
                 LABEL_WO_DRUGS,
                 LABEL_DEMOGRAPHICS,
@@ -59,5 +62,5 @@ if __name__ == "__main__":
         cohort_config["cohort_folder"] = DIR2COHORT / cohort_name_
         cohort_config[
             "expe_name"
-        ] = "sensitivity_feature_aggregation_albumin_for_sepsis"
+        ] = "sensitivity_confounders_albumin_for_sepsis"
         run_sensitivity_experiment(cohort_config)
