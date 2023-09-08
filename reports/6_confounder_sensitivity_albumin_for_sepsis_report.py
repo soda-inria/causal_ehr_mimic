@@ -68,7 +68,7 @@ results["label"] = (
     )
 )
 if MAIN_FIGURE:
-    results["label"] = results["feature_subset_clean"] + ", " + results["label"]
+    results["label"] = results["feature_subset_clean"]
 
 results.loc[mask_no_models, "label"] = results.loc[
     mask_no_models, "estimation_method"
