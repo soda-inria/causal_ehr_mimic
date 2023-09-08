@@ -10,7 +10,7 @@ from caumim.reports_utils import add_albumin_label, add_rct_gold_standard_line
 from caumim.variables.selection import FEATURE_SETS, LABEL_ALL_FEATURES
 
 # %%
-MAIN_FIGURE = False
+MAIN_FIGURE = True
 
 cohort_name = "sensitivity_confounders_albumin_for_sepsis__bs_50"
 ### For IP matching, interesting results with RF which seems to overfit the data and results are dependents on the aggregation strategy.
@@ -41,9 +41,10 @@ mask_all_features = results["feature_subset"] == LABEL_ALL_FEATURES
 mask_forest = results["treatment_model"] == "Forests"
 mask_dml = results["estimation_method"] == "DML"
 mask_unique_label = mask_all_features & mask_forest & mask_dml
+mask_dr = results["estimation_method"] == "DRLearner"
 
 if MAIN_FIGURE:
-    results = results.loc[(mask_forest & mask_dml) | mask_no_models]
+    results = results.loc[(mask_forest & mask_dr) | mask_no_models]
 else:
     # Forest DML and DR have exactly the same
     # results for two feature sets, change the label for DML line:
@@ -82,9 +83,20 @@ results["estimation_method"] = results["estimation_method"].map(
     if x in IDENTIFICATION2LABELS.keys()
     else x
 )
+
 if MAIN_FIGURE:
-    results["sortby"] = results["feature_subset"].map(
-        lambda x: -len(FEATURE_SETS[x]) if x in FEATURE_SETS.keys() else 0
+
+    def sort_feature_subset(feature_subset, label):
+        if feature_subset in FEATURE_SETS.keys():
+            return len(FEATURE_SETS[feature_subset])
+        elif label == "Unajusted risk difference":
+            return -1000
+        else:
+            # case rct
+            return 1000
+
+    results["sortby"] = results.apply(
+        lambda x: sort_feature_subset(x["feature_subset"], x["label"]), axis=1
     )
 else:
     results["sortby"] = (
