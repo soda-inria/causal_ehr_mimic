@@ -87,6 +87,7 @@ def run_sensitivity_experiment(config):
     target_trial_population = pl.read_parquet(
         cohort_folder / FILENAME_TARGET_POPULATION
     )
+    breakpoint()
     # FOR TESTING: subsample the data
     target_trial_population = target_trial_population.sample(
         fraction=config["fraction"], shuffle=True, seed=config.random_state

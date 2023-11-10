@@ -170,3 +170,6 @@ LABEL_MAPPING_HTE_BINARY_NAME = {
     "Race": {0: LABEL_WHITE, 1: LABEL_NON_WHITE},
     "Sex": {0: LABEL_MALE, 1: LABEL_FEMALE},
 }
+
+# shared x_lim for all sources of bias
+SHARED_X_LIM = (-0.1, 0.1)

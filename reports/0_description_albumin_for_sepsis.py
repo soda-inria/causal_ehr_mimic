@@ -1,6 +1,7 @@
 # %%
 # %load_ext autoreload
 # %autoreload 2
+from copy import deepcopy
 import pickle
 import numpy as np
 import pandas as pd
@@ -37,7 +38,18 @@ print(tables)
 # # Selection flowchart
 # %%
 # ## Load target population
-albumin_cohort_folder = create_cohort_folder(COHORT_CONFIG_ALBUMIN_FOR_SEPSIS)
+cohort_config = deepcopy(COHORT_CONFIG_ALBUMIN_FOR_SEPSIS)
+observation_window_in_day = 3
+cohort_config[
+    "min_icu_survival_unit_day"
+] = observation_window_in_day  # the patient should survive at least one day.
+cohort_config[
+    "min_los_icu_unit_day"
+] = observation_window_in_day  # the patient should stay in ICU at least one day.
+cohort_config[
+    "treatment_observation_window_unit_day"
+] = observation_window_in_day
+albumin_cohort_folder = create_cohort_folder(cohort_config)
 target_trial_population = pd.read_parquet(
     albumin_cohort_folder / FILENAME_TARGET_POPULATION
 )

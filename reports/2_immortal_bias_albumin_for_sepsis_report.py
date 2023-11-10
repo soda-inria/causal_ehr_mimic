@@ -23,7 +23,8 @@ COHORT_NAME2LABEL = {
     "albumin_for_sepsis__obs_1d": "24h",
     "albumin_for_sepsis__obs_3d": "72h",
 }
-IS_MAIN_FIGURE = False
+IS_MAIN_FIGURE = True
+SHARE_X_AXIS = False
 # %%
 # expe_name = "immortal_time_bias_double_robust_forest_agg_last__bs_50"
 expe_name = "immortal_time_bias_double_robust_forest_agg_first_last__bs_30"
@@ -96,6 +97,8 @@ else:
         "Observation period: 24h",
         "Observation period: 72h",
     ]
+if SHARE_X_AXIS:
+    figsize = (5, 1.5)
 axes = fp.forestplot(
     results,  # the dataframe with results data
     estimate=RESULT_ATE,  # col containing estimated effect size
@@ -118,7 +121,12 @@ if IS_MAIN_FIGURE:
 else:
     x_less = 1.05
     fontsize = 10
-axes = add_albumin_label(axes, x_less=x_less, fontsize=fontsize)
+if SHARE_X_AXIS:
+    axes.set(xlim=SHARED_X_LIM)
+    y_albumin = 1.05
+else:
+    y_albumin = 0.95
+axes = add_albumin_label(axes, x_less=x_less, fontsize=fontsize, y=y_albumin)
 
 path2img = DIR2DOCS_IMG / expe_name
 path2img.mkdir(exist_ok=True, parents=True)
@@ -126,6 +134,10 @@ if IS_MAIN_FIGURE:
     sup_str = ""
 else:
     sup_str = "_supp"
+if SHARE_X_AXIS:
+    sup_str = sup_str + "_shared_x_axis"
 plt.savefig(path2img / f"{expe_name}{sup_str}.pdf", bbox_inches="tight")
-plt.savefig(path2img / f"{expe_name}{sup_str}.png", bbox_inches="tight")
+plt.savefig(
+    path2img / f"{expe_name}{sup_str}.png", bbox_inches="tight", dpi=300
+)
 # %%

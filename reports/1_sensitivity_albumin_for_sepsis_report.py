@@ -12,6 +12,7 @@ from caumim.reports_utils import add_rct_gold_standard_line, add_albumin_label
 from copy import deepcopy
 
 IS_MAIN_FIGURE = True
+SHARE_X_AXIS = False
 # %%
 
 cohort_dir = create_cohort_folder(deepcopy(COHORT_CONFIG_ALBUMIN_FOR_SEPSIS))
@@ -28,7 +29,9 @@ if IS_MAIN_FIGURE:
     mask_causal_estimator = raw_results["estimation_method"].isin(
         ["CausalForest"]  # , "LinearDRLearner"]
     )
-    mask_agg = raw_results["event_aggregations"].isin(["['last']", "['first']"])
+    mask_agg = raw_results["event_aggregations"].isin(
+        ["['last']", "['first']"]
+    )
     # mask causal forests
     results = add_rct_gold_standard_line(
         raw_results[~mask_agg & ~mask_causal_estimator]
@@ -42,7 +45,12 @@ mask_no_models = results["estimation_method"].isin(
     ["Difference in mean", LABEL_RCT_GOLD_STANDARD_ATE]
 )
 compute_times = results[
-    ["estimation_method", "compute_time", "outcome_model", "event_aggregations"]
+    [
+        "estimation_method",
+        "compute_time",
+        "outcome_model",
+        "event_aggregations",
+    ]
 ].loc[~mask_no_models]
 if IS_MAIN_FIGURE:
     results["label"] = "Est=" + results["treatment_model"].map(
@@ -97,6 +105,8 @@ if IS_MAIN_FIGURE:
     figsize = (3, 4.5)
 else:
     figsize = (5, 12)
+if SHARE_X_AXIS:
+    figsize = (5, 4)
 
 axes = fp.forestplot(
     results,  # the dataframe with resultcodes data
@@ -115,6 +125,7 @@ axes = fp.forestplot(
     **{"marker": "D", "ylabel1_size": 10, "ylabel1_fontweight": "normal"},
 )
 axes.set(xlim=(-0.15, 0.1))
+
 if IS_MAIN_FIGURE:
     outlier_x = 12
     x_less = 1.15
@@ -123,6 +134,8 @@ else:
     outlier_x = 20
     x_less = 1.05
     fontsize = 10
+if SHARE_X_AXIS:
+    axes.set(xlim=SHARED_X_LIM)
 axes.text(0.1, outlier_x, "Outlier ▶", ha="right", va="center")
 axes = add_albumin_label(axes, x_less=x_less, fontsize=fontsize)
 
@@ -131,8 +144,10 @@ path2img = DIR2DOCS_IMG / cohort_name
 path2img.mkdir(exist_ok=True, parents=True)
 if not IS_MAIN_FIGURE:
     expe_name = expe_name + "_supplementary"
+if SHARE_X_AXIS:
+    expe_name = expe_name + "_shared_x_axis"
 plt.savefig(path2img / f"{expe_name}.pdf", bbox_inches="tight")
-plt.savefig(path2img / f"{expe_name}.png", bbox_inches="tight")
+plt.savefig(path2img / f"{expe_name}.png", bbox_inches="tight", dpi=300)
 compute_times.to_latex(path2img / f"compute_time_{expe_name}.tex")
 
 # %%
