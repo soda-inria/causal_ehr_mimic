@@ -11,7 +11,7 @@ from caumim.variables.selection import FEATURE_SETS, LABEL_ALL_FEATURES
 
 # %%
 MAIN_FIGURE = True
-SHARE_X_AXIS = False
+SHARE_X_AXIS = True
 
 cohort_name = "sensitivity_confounders_albumin_for_sepsis__bs_50"
 ### For IP matching, interesting results with RF which seems to overfit the data and results are dependents on the aggregation strategy.
@@ -155,6 +155,7 @@ else:
     y_albumin = 0.95
 if SHARE_X_AXIS:
     figsize = (5, 3)
+    x_less = 1
 axes = fp.forestplot(
     results,  # the dataframe with resultcodes data
     estimate=RESULT_ATE,  # col containing estimated effect size

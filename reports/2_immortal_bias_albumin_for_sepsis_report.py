@@ -24,7 +24,7 @@ COHORT_NAME2LABEL = {
     "albumin_for_sepsis__obs_3d": "72h",
 }
 IS_MAIN_FIGURE = True
-SHARE_X_AXIS = False
+SHARE_X_AXIS = True
 # %%
 # expe_name = "immortal_time_bias_double_robust_forest_agg_last__bs_50"
 expe_name = "immortal_time_bias_double_robust_forest_agg_first_last__bs_30"
@@ -99,6 +99,7 @@ else:
     ]
 if SHARE_X_AXIS:
     figsize = (5, 1.5)
+
 axes = fp.forestplot(
     results,  # the dataframe with results data
     estimate=RESULT_ATE,  # col containing estimated effect size
@@ -124,6 +125,7 @@ else:
 if SHARE_X_AXIS:
     axes.set(xlim=SHARED_X_LIM)
     y_albumin = 1.05
+    x_less = 1
 else:
     y_albumin = 0.95
 axes = add_albumin_label(axes, x_less=x_less, fontsize=fontsize, y=y_albumin)

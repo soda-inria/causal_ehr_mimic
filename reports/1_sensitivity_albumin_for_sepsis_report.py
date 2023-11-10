@@ -12,7 +12,7 @@ from caumim.reports_utils import add_rct_gold_standard_line, add_albumin_label
 from copy import deepcopy
 
 IS_MAIN_FIGURE = True
-SHARE_X_AXIS = False
+SHARE_X_AXIS = True
 # %%
 
 cohort_dir = create_cohort_folder(deepcopy(COHORT_CONFIG_ALBUMIN_FOR_SEPSIS))
@@ -136,6 +136,7 @@ else:
     fontsize = 10
 if SHARE_X_AXIS:
     axes.set(xlim=SHARED_X_LIM)
+    x_less = 1.0
 axes.text(0.1, outlier_x, "Outlier ▶", ha="right", va="center")
 axes = add_albumin_label(axes, x_less=x_less, fontsize=fontsize)
 
